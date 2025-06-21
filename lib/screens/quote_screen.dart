@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../services/quote_service.dart';
 import '../services/image_service.dart';
+import '../services/audio_service.dart';
 
 class QuoteScreen extends StatefulWidget {
   const QuoteScreen({super.key});
@@ -22,6 +23,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   String? _backgroundImageUrl;
   bool _isLoadingImage = false;
   int _gradientIndex = 0; // Track current gradient
+  bool _isAudioEnabled = true; // Audio toggle state
 
   // Dynamic gradients for different moods
   static const List<List<Color>> _gradients = [
@@ -96,6 +98,12 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
       // Set random gradient for new quotes
       _gradientIndex = DateTime.now().millisecondsSinceEpoch % _gradients.length;
     });
+    
+    // Play ambience for the tradition
+    if (_isAudioEnabled) {
+      await AudioService.playAmbience(quote.tradition);
+    }
+    
     final prompt = buildPrompt("${quote.tradition} ${quote.category}");
     print('[QuoteScreen] Generating background for: ${quote.tradition} ${quote.category}');
     final url = await DeepAIGenerator.generateImage(prompt);
@@ -116,7 +124,23 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   void dispose() {
     _fadeController.dispose();
     _scaleController.dispose();
+    AudioService.dispose(); // Clean up audio resources
     super.dispose();
+  }
+
+  // Toggle audio on/off
+  void _toggleAudio() {
+    setState(() {
+      _isAudioEnabled = !_isAudioEnabled;
+    });
+    
+    if (_isAudioEnabled) {
+      // Resume audio for current quote
+      AudioService.playAmbience(_currentQuote.tradition);
+    } else {
+      // Stop audio
+      AudioService.stopAmbience();
+    }
   }
 
   void _generateNewQuote() {
@@ -426,6 +450,16 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                       onPressed: _shareQuote,
                       backgroundColor: Colors.green.shade400,
                       child: const Icon(Icons.share, color: Colors.white),
+                    ),
+                    
+                    // Audio Toggle Button
+                    FloatingActionButton.small(
+                      onPressed: _toggleAudio,
+                      backgroundColor: _isAudioEnabled ? Colors.teal.shade400 : Colors.grey.shade400,
+                      child: Icon(
+                        _isAudioEnabled ? Icons.volume_up : Icons.volume_off,
+                        color: Colors.white,
+                      ),
                     ),
                     
                     // Background Refresh Button
