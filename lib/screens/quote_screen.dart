@@ -181,87 +181,101 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                           scale: _scaleAnimation.value,
                           child: Opacity(
                             opacity: _fadeAnimation.value,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(32),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.22),
-                                    borderRadius: BorderRadius.circular(24),
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.4),
-                                      width: 1.5,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.10),
-                                        blurRadius: 24,
-                                        offset: const Offset(0, 10),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      // Tradition Badge
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 8,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _getTraditionColor(_currentQuote.tradition),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          _currentQuote.tradition,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
+                            child: Align(
+                              alignment: Alignment.center,
+                              widthFactor: 0.7,
+                              // Remove heightFactor for dynamic height
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 480),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(32),
+                                  child: BackdropFilter(
+                                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(vertical: 24),
+                                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.01),
+                                        borderRadius: BorderRadius.circular(32),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.10),
+                                            blurRadius: 24,
+                                            offset: const Offset(0, 10),
                                           ),
-                                        ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 24),
-                                      
-                                      // Quote Text
-                                      Text(
-                                        '"${_currentQuote.text}"',
-                                        style: const TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.w300,
-                                          height: 1.4,
-                                          color: Colors.black87,
-                                        ),
-                                        textAlign: TextAlign.center,
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Tradition Badge
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 8,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: _getTraditionColor(_currentQuote.tradition),
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Text(
+                                              _currentQuote.tradition,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 24),
+                                          
+                                          // Quote Text
+                                          Text(
+                                            '"${_currentQuote.text}"',
+                                            style: const TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.w300,
+                                              height: 1.4,
+                                              color: Colors.white,
+                                              shadows: [
+                                                Shadow(blurRadius: 8, color: Colors.black54, offset: Offset(0, 2)),
+                                              ],
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                          const SizedBox(height: 24),
+                                          
+                                          // Author
+                                          Text(
+                                            '- ${_currentQuote.author}',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.white.withOpacity(0.85),
+                                              fontStyle: FontStyle.italic,
+                                              shadows: const [
+                                                Shadow(blurRadius: 6, color: Colors.black38, offset: Offset(0, 1)),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          
+                                          // Category
+                                          Text(
+                                            _currentQuote.category,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.white.withOpacity(0.7),
+                                              fontWeight: FontWeight.w400,
+                                              shadows: const [
+                                                Shadow(blurRadius: 4, color: Colors.black26, offset: Offset(0, 1)),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 24),
-                                      
-                                      // Author
-                                      Text(
-                                        '- ${_currentQuote.author}',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.grey.shade700,
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      
-                                      // Category
-                                      Text(
-                                        _currentQuote.category,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey.shade500,
-                                          fontWeight: FontWeight.w400,
-                                        ),
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                 ),
                               ),
