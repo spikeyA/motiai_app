@@ -21,6 +21,19 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
 
   String? _backgroundImageUrl;
   bool _isLoadingImage = false;
+  int _gradientIndex = 0; // Track current gradient
+
+  // Dynamic gradients for different moods
+  static const List<List<Color>> _gradients = [
+    [Color(0xFFFF6B6B), Color(0xFF4ECDC4), Color(0xFF45B7D1)], // Warm sunset
+    [Color(0xFF667eea), Color(0xFF764ba2), Color(0xFFf093fb)], // Purple dream
+    [Color(0xFFf093fb), Color(0xFFf5576c), Color(0xFF4facfe)], // Pink passion
+    [Color(0xFF4facfe), Color(0xFF00f2fe), Color(0xFF43e97b)], // Ocean breeze
+    [Color(0xFFfa709a), Color(0xFFfee140), Color(0xFFFF6B6B)], // Golden hour
+    [Color(0xFFa8edea), Color(0xFFfed6e3), Color(0xFFffecd2)], // Soft pastels
+    [Color(0xFFff9a9e), Color(0xFFfecfef), Color(0xFFfecfef)], // Rose gold
+    [Color(0xFFa8caba), Color(0xFF5d4e75), Color(0xFFffecd2)], // Nature calm
+  ];
 
   @override
   void initState() {
@@ -54,11 +67,21 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
     setState(() {
       _isLoadingImage = true;
       _backgroundImageUrl = null;
+      // Set random gradient for new quotes
+      _gradientIndex = DateTime.now().millisecondsSinceEpoch % _gradients.length;
     });
     final prompt = buildPrompt("${quote.tradition} ${quote.category}");
+    print('[QuoteScreen] Generating background for: ${quote.tradition} ${quote.category}');
     final url = await DeepAIGenerator.generateImage(prompt);
+    print('[QuoteScreen] Received image URL: $url');
     setState(() {
-      _backgroundImageUrl = url;
+      // Only set URL if it's a valid AI-generated image, not a fallback
+      if (url != null && !url.contains('unsplash.com')) {
+        _backgroundImageUrl = url;
+      } else {
+        _backgroundImageUrl = null; // Use gradient background
+        print('[QuoteScreen] Using gradient background instead of fallback image');
+      }
       _isLoadingImage = false;
     });
   }
@@ -78,6 +101,26 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
       _generateBackgroundImage(_currentQuote);
       _fadeController.forward();
       _scaleController.forward();
+    });
+  }
+
+  void _generateNewBackground(Quote quote) async {
+    setState(() {
+      _isLoadingImage = true;
+      // Cycle to next gradient
+      _gradientIndex = (_gradientIndex + 1) % _gradients.length;
+    });
+    final prompt = buildPrompt("${quote.tradition} ${quote.category}");
+    final url = await DeepAIGenerator.generateImage(prompt);
+    setState(() {
+      // Only set URL if it's a valid AI-generated image, not a fallback
+      if (url != null && !url.contains('unsplash.com')) {
+        _backgroundImageUrl = url;
+      } else {
+        _backgroundImageUrl = null; // Use gradient background
+        print('[QuoteScreen] Using gradient background for refresh');
+      }
+      _isLoadingImage = false;
     });
   }
 
@@ -130,13 +173,55 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
     return Scaffold(
       body: Stack(
         children: [
-          // AI-generated background image
-          if (_backgroundImageUrl != null)
+          // Beautiful gradient background (primary)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: _gradients[_gradientIndex],
+                ),
+              ),
+            ),
+          ),
+          // AI-generated background image (only if available and valid)
+          if (_backgroundImageUrl != null && _backgroundImageUrl!.isNotEmpty)
             Positioned.fill(
               child: Image.network(
                 _backgroundImageUrl!,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey.shade200),
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: _gradients[_gradientIndex],
+                      ),
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print('[Image] Failed to load: $_backgroundImageUrl');
+                  print('[Image] Error: $error');
+                  // Return the gradient background instead of gray
+                  return Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: _gradients[_gradientIndex],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           // Loading spinner overlay
@@ -315,6 +400,13 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                       onPressed: _shareQuote,
                       backgroundColor: Colors.green.shade400,
                       child: const Icon(Icons.share, color: Colors.white),
+                    ),
+                    
+                    // Background Refresh Button
+                    FloatingActionButton.small(
+                      onPressed: () => _generateNewBackground(_currentQuote),
+                      backgroundColor: Colors.orange.shade400,
+                      child: const Icon(Icons.refresh, color: Colors.white),
                     ),
                     
                     // Generate New Quote Button
