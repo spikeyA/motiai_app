@@ -7,6 +7,7 @@ A beautiful Flutter macOS app that generates motivational quotes from Buddhist, 
 - **Wisdom Quotes**: Curated collection of inspirational quotes from Buddhism, Sufism, and Zen traditions
 - **Dynamic Gradient Backgrounds**: 8 beautiful, vibrant gradient combinations that change dynamically
 - **Background Refresh**: Tap the refresh button to cycle through different gradient backgrounds
+- **Audio Ambience**: Tradition-specific ambient sounds that play automatically with each quote
 - **AI-Generated Backgrounds**: Unique, AI-generated background images using DeepAI (when API credits available)
 - **Favorite Quotes**: Heart button to save and manage your favorite quotes with persistent local storage
 - **Tradition Filtering**: Filter quotes by spiritual tradition (Buddhism, Sufism, Zen)
@@ -15,7 +16,30 @@ A beautiful Flutter macOS app that generates motivational quotes from Buddhist, 
 - **Dynamic Sizing**: Quote cards automatically resize to fit content
 - **Smooth Animations**: Elegant fade and scale animations for quote transitions
 
-## 🎨 Dynamic Gradients
+## 🎵 Audio Ambience
+
+The app features tradition-specific ambient sounds that enhance the meditation experience:
+
+### **Tradition-Specific Sounds:**
+- **Buddhist**: Meditation bells and OM tones for spiritual awakening
+- **Sufi**: Ney flute for mystical and meditative experiences  
+- **Zen**: Calm river flowing sounds for peaceful meditation
+
+### **Audio Controls:**
+- **Auto-Play**: Ambience starts automatically when quotes change
+- **Toggle Button**: Tap the volume icon to turn audio on/off
+- **30-Second Intervals**: Audio automatically restarts every 30 seconds for continuous meditation
+- **Loop Mode**: Sounds play continuously in the background
+- **Smart Switching**: Audio changes automatically based on quote tradition
+- **User Interruption**: Audio stops when user generates new quotes or toggles audio off
+
+### **Audio Files Included:**
+- `meditation_bells.mp3` - Buddhist meditation bells (971KB)
+- `ney-flute.mp3` - Sufi mystical flute (6.7MB)
+- `calm-zen-river-flowing.mp3` - Zen river ambience (2.1MB)
+- `om_tone.mp3` - Buddhist OM chanting (599KB)
+
+##  Dynamic Gradients
 
 The app features 8 carefully crafted gradient combinations:
 - **Warm Sunset**: Red to teal to blue
