@@ -35,6 +35,32 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
     [Color(0xFFa8caba), Color(0xFF5d4e75), Color(0xFFffecd2)], // Nature calm
   ];
 
+  // Calculate if current gradient is dark or light
+  bool get _isDarkBackground {
+    final colors = _gradients[_gradientIndex];
+    double totalLuminance = 0;
+    for (final color in colors) {
+      totalLuminance += color.computeLuminance();
+    }
+    return (totalLuminance / colors.length) < 0.5;
+  }
+
+  // Get appropriate text color based on background
+  Color get _textColor => _isDarkBackground ? Colors.white : Colors.black;
+
+  // Get appropriate text shadows based on background
+  List<Shadow> get _textShadows {
+    if (_isDarkBackground) {
+      return [
+        Shadow(blurRadius: 8, color: Colors.black54, offset: const Offset(0, 2)),
+      ];
+    } else {
+      return [
+        Shadow(blurRadius: 8, color: Colors.white70, offset: const Offset(0, 2)),
+      ];
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -229,13 +255,17 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
             Positioned.fill(
               child: Container(
                 color: Colors.black.withOpacity(0.2),
-                child: const Center(child: CircularProgressIndicator()),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(_textColor),
+                  ),
+                ),
               ),
             ),
           // Dark overlay for readability
           Positioned.fill(
             child: Container(
-              color: Colors.black.withOpacity(0.35),
+              color: Colors.black.withOpacity(0.15),
             ),
           ),
           // Main content
@@ -249,8 +279,9 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade800,
+                    color: _textColor,
                     letterSpacing: 2,
+                    shadows: _textShadows,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -259,8 +290,9 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                   'Wisdom from Ancient Traditions',
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.grey.shade600,
+                    color: _textColor.withOpacity(0.8),
                     fontStyle: FontStyle.italic,
+                    shadows: _textShadows,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -321,14 +353,12 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                     // Quote Text
                                     Text(
                                       '"${_currentQuote.text}"',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 24,
                                         fontWeight: FontWeight.w300,
                                         height: 1.4,
-                                        color: Colors.white,
-                                        shadows: [
-                                          Shadow(blurRadius: 8, color: Colors.black54, offset: Offset(0, 2)),
-                                        ],
+                                        color: _textColor,
+                                        shadows: _textShadows,
                                       ),
                                       textAlign: TextAlign.center,
                                     ),
@@ -340,11 +370,9 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.w500,
-                                        color: Colors.white.withOpacity(0.85),
+                                        color: _textColor.withOpacity(0.85),
                                         fontStyle: FontStyle.italic,
-                                        shadows: const [
-                                          Shadow(blurRadius: 6, color: Colors.black38, offset: Offset(0, 1)),
-                                        ],
+                                        shadows: _textShadows,
                                       ),
                                     ),
                                     const SizedBox(height: 16),
@@ -354,11 +382,9 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                       _currentQuote.category,
                                       style: TextStyle(
                                         fontSize: 14,
-                                        color: Colors.white.withOpacity(0.7),
+                                        color: _textColor.withOpacity(0.7),
                                         fontWeight: FontWeight.w400,
-                                        shadows: const [
-                                          Shadow(blurRadius: 4, color: Colors.black26, offset: Offset(0, 1)),
-                                        ],
+                                        shadows: _textShadows,
                                       ),
                                     ),
                                     const SizedBox(height: 20),
@@ -371,7 +397,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                         return IconButton(
                                           icon: Icon(
                                             isFavorited ? Icons.favorite : Icons.favorite_border,
-                                            color: isFavorited ? Colors.red.shade400 : Colors.white.withOpacity(0.8),
+                                            color: isFavorited ? Colors.red.shade400 : _textColor.withOpacity(0.8),
                                             size: 28,
                                           ),
                                           onPressed: () => _toggleFavorite(_currentQuote),
