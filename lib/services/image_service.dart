@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../secrets.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class DeepAIGenerator {
   static const _endpoint = 'https://api.deepai.org/api/text2img';
@@ -8,10 +10,11 @@ class DeepAIGenerator {
 
   static Future<String?> generateImage(String prompt) async {
     print('[DeepAI] Prompt: $prompt');
+    final apiKey = dotenv.env['DEEPAI_API_KEY'];
     try {
       final response = await http.post(
         Uri.parse(_endpoint),
-        headers: {'api-key': _apiKey},
+        headers: {'api-key': apiKey ?? ''},
         body: {'text': prompt},
       );
       print('[DeepAI] Status: ${response.statusCode}');
