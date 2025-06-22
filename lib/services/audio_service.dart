@@ -13,6 +13,12 @@ class AudioService {
     'Buddhist': 'audio/meditation_bells.mp3',
     'Sufi': 'audio/ney-flute.mp3',
     'Zen': 'audio/calm-zen-river-flowing.mp3',
+    'Taoism': 'audio/meditation_bells.mp3',
+    'Stoicism': 'audio/meditation_bells.mp3',
+    'Indigenous Wisdom': 'audio/meditation_bells.mp3',
+    'Mindful Tech': 'audio/meditation_bells.mp3',
+    'Eco-Spirituality': 'audio/calm-zen-river-flowing.mp3',
+    'Poetic Sufism': 'audio/ney-flute.mp3',
   };
 
   // Fallback sounds if specific tradition audio is not available
@@ -20,6 +26,12 @@ class AudioService {
     'Buddhist': 'audio/om_tone.mp3',
     'Sufi': 'audio/ney-flute.mp3',
     'Zen': 'audio/calm-zen-river-flowing.mp3',
+    'Taoism': 'audio/om_tone.mp3',
+    'Stoicism': 'audio/om_tone.mp3',
+    'Indigenous Wisdom': 'audio/om_tone.mp3',
+    'Mindful Tech': 'audio/om_tone.mp3',
+    'Eco-Spirituality': 'audio/calm-zen-river-flowing.mp3',
+    'Poetic Sufism': 'audio/ney-flute.mp3',
   };
 
   /// Play ambience sound for a specific tradition
