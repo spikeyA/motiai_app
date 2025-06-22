@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'screens/quote_screen.dart';
-
+// import 'services/hybrid_quote_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,6 +10,10 @@ Future<void> main() async {
   // Initialize Hive
   await Hive.initFlutter();
   await Hive.openBox('favorites');
+  await Hive.openBox('quotes_cache');
+  
+  // Initialize Hybrid Quote Service (Firebase + Local fallback)
+  // await HybridQuoteService.initialize();
   
   // Load environment variables
   const envPath = '/Users/aparnashastry/Library/Containers/com.example.motiaiApp/Data/.env';
