@@ -4,17 +4,41 @@ A beautiful Flutter macOS app that generates motivational quotes from Buddhist, 
 
 ## ✨ Features
 
-- **Wisdom Quotes**: Curated collection of inspirational quotes from Buddhism, Sufism, and Zen traditions
+- **Wisdom Quotes**: Curated collection of inspirational quotes from 9 spiritual traditions
 - **Dynamic Gradient Backgrounds**: 8 beautiful, vibrant gradient combinations that change dynamically
 - **Background Refresh**: Tap the refresh button to cycle through different gradient backgrounds
 - **Audio Ambience**: Tradition-specific ambient sounds that play automatically with each quote
 - **AI-Generated Backgrounds**: Unique, AI-generated background images using DeepAI (when API credits available)
 - **Favorite Quotes**: Heart button to save and manage your favorite quotes with persistent local storage
-- **Tradition Filtering**: Filter quotes by spiritual tradition (Buddhism, Sufism, Zen)
+- **Tradition Filtering**: Filter quotes by spiritual tradition
 - **Beautiful UI**: Modern, minimalist design with frosted glass quote cards
 - **Quote Sharing**: Share inspirational quotes with others via clipboard
 - **Dynamic Sizing**: Quote cards automatically resize to fit content
 - **Smooth Animations**: Elegant fade and scale animations for quote transitions
+
+## 🧘‍♀️ Spiritual Traditions
+
+The app features wisdom quotes from 9 diverse spiritual traditions:
+
+### **Core Traditions:**
+- **Buddhist**: Teachings of Buddha on peace, mindfulness, and enlightenment
+- **Sufi**: Mystical Islamic wisdom from Rumi and Sufi masters
+- **Zen**: Japanese Zen philosophy on simplicity and presence
+
+### **New Traditions:**
+- **Taoism**: Ancient Chinese wisdom from Lao Tzu on flow and harmony
+- **Stoicism**: Roman philosophy on resilience, virtue, and control
+- **Indigenous Wisdom**: Native American proverbs on connection and community
+- **Mindful Tech**: Contemporary wisdom on technology and mindfulness
+- **Eco-Spirituality**: Environmental consciousness and nature reverence
+- **Poetic Sufism**: Rumi's mystical poetry on divine love and awakening
+
+### **Quote Categories:**
+Each tradition includes quotes across multiple categories including:
+- Peace, Mindfulness, Truth, Self-Love, Gratitude, Health, Spirituality, Happiness
+- Transformation, Destiny, Healing, Hope, Love, Possibility, Joy, Silence
+- Flow, Wisdom, Harmony, Simplicity, Balance, Control, Resilience, Virtue
+- Connection, Community, Reverence, Consciousness, Stewardship, Mystery, Union
 
 ## 🎵 Audio Ambience
 

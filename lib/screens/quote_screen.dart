@@ -208,13 +208,25 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   Color _getTraditionColor(String tradition) {
     switch (tradition) {
       case 'Buddhist':
-        return Colors.orange.shade300;
+        return Colors.orange.shade400; // Warm orange for Buddhist wisdom
       case 'Sufi':
-        return Colors.purple.shade300;
+        return Colors.purple.shade400; // Mystical purple for Sufi tradition
       case 'Zen':
-        return Colors.teal.shade300;
+        return Colors.teal.shade400; // Calm teal for Zen philosophy
+      case 'Taoism':
+        return Colors.green.shade500; // Natural green for Taoist harmony
+      case 'Stoicism':
+        return Colors.indigo.shade500; // Deep indigo for Stoic strength
+      case 'Indigenous Wisdom':
+        return Colors.brown.shade600; // Earth brown for Indigenous connection
+      case 'Mindful Tech':
+        return Colors.blue.shade500; // Tech blue for mindful technology
+      case 'Eco-Spirituality':
+        return Colors.lightGreen.shade600; // Eco green for environmental wisdom
+      case 'Poetic Sufism':
+        return Colors.pink.shade400; // Poetic pink for mystical poetry
       default:
-        return Colors.grey.shade300;
+        return Colors.grey.shade400; // Fallback grey
     }
   }
 
@@ -439,7 +451,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                   },
                 ),
                 
-                const SizedBox(height: 40),
+                const SizedBox(height: 24),
                 
                 // Action Buttons
                 Row(
@@ -499,33 +511,135 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   void _showTraditionDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choose Tradition'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: QuoteService.getTraditions().map((tradition) {
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: _getTraditionColor(tradition),
-                child: Text(
-                  tradition[0],
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.2),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Title
+                    Text(
+                      'Choose Tradition',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: _textColor,
+                        shadows: _textShadows,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Traditions List
+                    ...QuoteService.getTraditions().map((tradition) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context);
+                            _generateQuoteByTradition(tradition);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.1),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: _getTraditionColor(tradition),
+                                  radius: 20,
+                                  child: Text(
+                                    tradition[0],
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Text(
+                                    tradition,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: _textColor,
+                                      shadows: _textShadows,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: _textColor.withOpacity(0.6),
+                                  size: 16,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    
+                    const SizedBox(height: 20),
+                    
+                    // Cancel Button
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                      ),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: _textColor.withOpacity(0.8),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          shadows: _textShadows,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              title: Text(tradition),
-              onTap: () {
-                Navigator.pop(context);
-                _generateQuoteByTradition(tradition);
-              },
-            );
-          }).toList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
