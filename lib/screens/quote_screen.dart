@@ -538,103 +538,102 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                     ),
                   ],
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Title
-                    Text(
-                      'Choose Tradition',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: _textColor,
-                        shadows: _textShadows,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Traditions List
-                    ...QuoteService.getTraditions().map((tradition) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.pop(context);
-                            _generateQuoteByTradition(tradition);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.1),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: _getTraditionColor(tradition),
-                                  radius: 20,
-                                  child: Text(
-                                    tradition[0],
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Text(
-                                    tradition,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                      color: _textColor,
-                                      shadows: _textShadows,
-                                    ),
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.arrow_forward_ios,
-                                  color: _textColor.withOpacity(0.6),
-                                  size: 16,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Cancel Button
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                      ),
-                      child: Text(
-                        'Cancel',
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Title
+                      Text(
+                        'Choose Tradition',
                         style: TextStyle(
-                          color: _textColor.withOpacity(0.8),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: _textColor,
                           shadows: _textShadows,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 20),
+                      // Traditions List
+                      ...QuoteService.getTraditions().map((tradition) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.pop(context);
+                              _generateQuoteByTradition(tradition);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.1),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: _getTraditionColor(tradition),
+                                    radius: 20,
+                                    child: Text(
+                                      tradition[0],
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text(
+                                      tradition,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                        color: _textColor,
+                                        shadows: _textShadows,
+                                      ),
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    color: _textColor.withOpacity(0.6),
+                                    size: 16,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      const SizedBox(height: 20),
+                      // Cancel Button
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: _textColor.withOpacity(0.8),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            shadows: _textShadows,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
