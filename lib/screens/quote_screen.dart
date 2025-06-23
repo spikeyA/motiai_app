@@ -2,19 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../services/hive_quote_service.dart';
 import '../services/quote_service.dart';
 import '../services/image_service.dart';
 import '../services/audio_service.dart';
+import '../models/quote.dart';
 
 class QuoteScreen extends StatefulWidget {
-  const QuoteScreen({super.key});
+  final String? category;
+  final String? tradition;
+
+  const QuoteScreen({Key? key, this.category, this.tradition}) : super(key: key);
 
   @override
-  State<QuoteScreen> createState() => _QuoteScreenState();
+  _QuoteScreenState createState() => _QuoteScreenState();
 }
 
 class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin {
-  late Quote _currentQuote;
+  Quote? _currentQuote;
+  Quote? _nextAIQuote; // Store the next AI quote in the background
   late AnimationController _fadeController;
   late AnimationController _scaleController;
   late Animation<double> _fadeAnimation;
@@ -66,7 +72,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _currentQuote = QuoteService.getRandomQuote();
+    _initializeQuote();
     
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -88,7 +94,28 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
     
     _fadeController.forward();
     _scaleController.forward();
-    _generateBackgroundImage(_currentQuote);
+  }
+
+  Future<void> _initializeQuote() async {
+    // 1. Show a Hive/local quote immediately
+    final localQuote = await HiveQuoteService.instance.getRandomQuoteFromLocalOnly(
+      category: widget.category,
+      tradition: widget.tradition,
+    );
+    setState(() {
+      _currentQuote = localQuote;
+    });
+    // 2. In the background, start fetching the next AI quote
+    _fetchNextAIQuote();
+  }
+
+  Future<void> _fetchNextAIQuote() async {
+    final aiQuote = await HiveQuoteService.fetchQuoteFromDeepAI();
+    if (mounted) {
+      setState(() {
+        _nextAIQuote = aiQuote;
+      });
+    }
   }
 
   Future<void> _generateBackgroundImage(Quote quote) async {
@@ -136,21 +163,36 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
     
     if (_isAudioEnabled) {
       // Resume audio for current quote
-      AudioService.playAmbience(_currentQuote.tradition);
+      AudioService.playAmbience(_currentQuote!.tradition);
     } else {
       // Stop audio
       AudioService.stopAmbience();
     }
   }
 
-  void _generateNewQuote() {
-    _fadeController.reverse().then((_) {
-      setState(() {
-        _currentQuote = QuoteService.getRandomQuote();
-      });
-      _generateBackgroundImage(_currentQuote);
+  void _generateNewQuote() async {
+    _fadeController.reverse().then((_) async {
+      Quote? quoteToShow;
+      if (_nextAIQuote != null) {
+        quoteToShow = _nextAIQuote;
+        _nextAIQuote = null; // Consume the AI quote
+      } else {
+        quoteToShow = await HiveQuoteService.instance.getRandomQuoteFromLocalOnly(
+          category: widget.category,
+          tradition: widget.tradition,
+        );
+      }
+      if (quoteToShow != null) {
+        setState(() {
+          _currentQuote = quoteToShow;
+        });
+        print('[QuoteScreen] Showing quote: "${_currentQuote!.text}" - ${_currentQuote!.author} [${_currentQuote!.tradition} / ${_currentQuote!.category}] (id: ${_currentQuote!.id})');
+      }
+      _generateBackgroundImage(_currentQuote!);
       _fadeController.forward();
       _scaleController.forward();
+      // Start fetching the next AI quote in the background
+      _fetchNextAIQuote();
     });
   }
 
@@ -174,19 +216,23 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
     });
   }
 
-  void _generateQuoteByTradition(String tradition) {
-    _fadeController.reverse().then((_) {
-      setState(() {
-        _currentQuote = QuoteService.getQuoteByTradition(tradition);
-      });
-      _generateBackgroundImage(_currentQuote);
+  void _generateQuoteByTradition(String tradition) async {
+    _fadeController.reverse().then((_) async {
+      final quote = await HiveQuoteService.instance.getRandomQuote(tradition: tradition);
+      if (quote != null) {
+        setState(() {
+          _currentQuote = quote;
+        });
+        print('[QuoteScreen] Showing quote: "${_currentQuote!.text}" - ${_currentQuote!.author} [${_currentQuote!.tradition} / ${_currentQuote!.category}] (id: ${_currentQuote!.id})');
+      }
+      _generateBackgroundImage(_currentQuote!);
       _fadeController.forward();
       _scaleController.forward();
     });
   }
 
   void _shareQuote() {
-    final quoteText = '"${_currentQuote.text}"\n- ${_currentQuote.author}';
+    final quoteText = '"${_currentQuote!.text}"\n- ${_currentQuote!.author}';
     Clipboard.setData(ClipboardData(text: quoteText));
     
     ScaffoldMessenger.of(context).showSnackBar(
@@ -232,6 +278,16 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    if (_currentQuote == null) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    // Log the source for debugging, but do not show in UI
+    final isAIQuote = _currentQuote!.id.startsWith('ai_');
+    print('[QuoteScreen] Source: ${isAIQuote ? 'AI' : 'Local'}');
     return Scaffold(
       body: Stack(
         children: [
@@ -372,11 +428,11 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                         vertical: 8,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: _getTraditionColor(_currentQuote.tradition),
+                                        color: _getTraditionColor(_currentQuote!.tradition),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
-                                        _currentQuote.tradition,
+                                        _currentQuote!.tradition,
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
@@ -388,7 +444,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                     
                                     // Quote Text
                                     Text(
-                                      '"${_currentQuote.text}"',
+                                      '"${_currentQuote!.text}"',
                                       style: TextStyle(
                                         fontSize: 24,
                                         fontWeight: FontWeight.w300,
@@ -402,7 +458,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                     
                                     // Author
                                     Text(
-                                      '- ${_currentQuote.author}',
+                                      '- ${_currentQuote!.author}',
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.w500,
@@ -415,7 +471,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                     
                                     // Category
                                     Text(
-                                      _currentQuote.category,
+                                      _currentQuote!.category,
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: _textColor.withOpacity(0.7),
@@ -429,14 +485,14 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                     ValueListenableBuilder(
                                       valueListenable: Hive.box('favorites').listenable(),
                                       builder: (context, box, child) {
-                                        final isFavorited = box.get(_currentQuote.id) ?? false;
+                                        final isFavorited = box.get(_currentQuote!.id) ?? false;
                                         return IconButton(
                                           icon: Icon(
                                             isFavorited ? Icons.favorite : Icons.favorite_border,
                                             color: isFavorited ? Colors.red.shade400 : _textColor.withOpacity(0.8),
                                             size: 28,
                                           ),
-                                          onPressed: () => _toggleFavorite(_currentQuote),
+                                          onPressed: () => _toggleFavorite(_currentQuote!),
                                         );
                                       },
                                     ),
@@ -476,7 +532,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                     
                     // Background Refresh Button
                     FloatingActionButton.small(
-                      onPressed: () => _generateNewBackground(_currentQuote),
+                      onPressed: () => _generateNewBackground(_currentQuote!),
                       backgroundColor: Colors.orange.shade400,
                       child: const Icon(Icons.refresh, color: Colors.white),
                     ),
@@ -554,7 +610,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                       ),
                       const SizedBox(height: 20),
                       // Traditions List
-                      ...QuoteService.getTraditions().map((tradition) {
+                      ...QuoteServiceHelper.getTraditions().map((tradition) {
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: GestureDetector(
