@@ -18,6 +18,7 @@ class FirebaseService {
   // Get all quotes
   static Future<List<Quote>> getAllQuotes() async {
     try {
+      print('[Firebase] Fetching ALL quotes from Firestore...');
       final QuerySnapshot snapshot = await _firestore
           .collection(_quotesCollection)
           .get();
@@ -42,6 +43,7 @@ class FirebaseService {
   // Get quotes by tradition
   static Future<List<Quote>> getQuotesByTradition(String tradition) async {
     try {
+      print('[Firebase] Fetching quotes for tradition: $tradition');
       final QuerySnapshot snapshot = await _firestore
           .collection(_quotesCollection)
           .where('tradition', isEqualTo: tradition)
@@ -67,14 +69,16 @@ class FirebaseService {
   // Get random quote
   static Future<Quote?> getRandomQuote() async {
     try {
+      print('[Firebase] Fetching RANDOM quote from Firestore...');
       final QuerySnapshot snapshot = await _firestore
           .collection(_quotesCollection)
           .limit(1)
           .get();
-      
+      print('[Firebase] Firestore returned ${snapshot.docs.length} docs');
       if (snapshot.docs.isNotEmpty) {
         final doc = snapshot.docs.first;
         final data = doc.data() as Map<String, dynamic>;
+        print('[Firebase] RANDOM quote data: $data');
         return Quote(
           id: doc.id,
           text: data['text'] ?? '',
@@ -84,6 +88,7 @@ class FirebaseService {
           imageUrl: data['imageUrl'] ?? '',
         );
       }
+      print('[Firebase] No quotes found in Firestore!');
       return null;
     } catch (e) {
       print('Error fetching random quote: $e');
@@ -94,15 +99,17 @@ class FirebaseService {
   // Get random quote by tradition
   static Future<Quote?> getRandomQuoteByTradition(String tradition) async {
     try {
+      print('[Firebase] Fetching RANDOM quote for tradition: $tradition');
       final QuerySnapshot snapshot = await _firestore
           .collection(_quotesCollection)
           .where('tradition', isEqualTo: tradition)
           .limit(1)
           .get();
-      
+      print('[Firebase] Firestore returned ${snapshot.docs.length} docs for tradition $tradition');
       if (snapshot.docs.isNotEmpty) {
         final doc = snapshot.docs.first;
         final data = doc.data() as Map<String, dynamic>;
+        print('[Firebase] RANDOM quote data for $tradition: $data');
         return Quote(
           id: doc.id,
           text: data['text'] ?? '',
@@ -112,6 +119,7 @@ class FirebaseService {
           imageUrl: data['imageUrl'] ?? '',
         );
       }
+      print('[Firebase] No quotes found in Firestore for tradition $tradition!');
       return null;
     } catch (e) {
       print('Error fetching random quote by tradition: $e');

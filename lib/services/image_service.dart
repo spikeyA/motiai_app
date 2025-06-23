@@ -25,25 +25,32 @@ class DeepAIGenerator {
 
   static Future<String?> generateImage(String prompt) async {
     print('[DeepAI] Prompt: $prompt');
-    final apiKey = dotenv.env['DEEPAI_API_KEY'];
-    try {
-      final response = await http.post(
-        Uri.parse(_endpoint),
-        headers: {'api-key': apiKey ?? ''},
-        body: {'text': prompt},
-      );
-      print('[DeepAI] Status: ${response.statusCode}');
-      print('[DeepAI] Body: ${response.body}');
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final url = data['output_url'] as String?;
-        print('[DeepAI] Output URL: $url');
-        return url ?? _getDefaultImageForPrompt(prompt);
+    
+    // Check if .env is loaded
+    if (dotenv.isInitialized) {
+      final apiKey = dotenv.env['DEEPAI_API_KEY'];
+      try {
+        final response = await http.post(
+          Uri.parse(_endpoint),
+          headers: {'api-key': apiKey ?? ''},
+          body: {'text': prompt},
+        );
+        print('[DeepAI] Status: ${response.statusCode}');
+        print('[DeepAI] Body: ${response.body}');
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final url = data['output_url'] as String?;
+          print('[DeepAI] Output URL: $url');
+          return url ?? _getDefaultImageForPrompt(prompt);
+        }
+        print('[DeepAI] Error: Non-200 response - using vibrant default image');
+        return _getDefaultImageForPrompt(prompt);
+      } catch (e) {
+        print('[DeepAI] Exception: $e - using vibrant default image');
+        return _getDefaultImageForPrompt(prompt);
       }
-      print('[DeepAI] Error: Non-200 response - using vibrant default image');
-      return _getDefaultImageForPrompt(prompt);
-    } catch (e) {
-      print('[DeepAI] Exception: $e - using vibrant default image');
+    } else {
+      print('[DeepAI] Error: .env not loaded - using vibrant default image');
       return _getDefaultImageForPrompt(prompt);
     }
   }

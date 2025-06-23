@@ -1,48 +1,59 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:io';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'screens/quote_screen.dart';
-// import 'services/hybrid_quote_service.dart';
+import 'services/hive_quote_service.dart';
+import 'models/quote.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Initialize Hive
   await Hive.initFlutter();
-  await Hive.openBox('favorites');
-  await Hive.openBox('quotes_cache');
+  Hive.registerAdapter(QuoteAdapter());
   
-  // Initialize Hybrid Quote Service (Firebase + Local fallback)
-  // await HybridQuoteService.initialize();
+  // Initialize HiveQuoteService
+  await HiveQuoteService.initialize();
   
   // Load environment variables
-  const envPath = '/Users/aparnashastry/Library/Containers/com.example.motiaiApp/Data/.env';
-  print('Loading .env from: $envPath');
-  await dotenv.load(fileName: envPath);
+  try {
+    await dotenv.load();
+    print('Loading .env from: ${dotenv.env['DEEP_AI_API_KEY'] != null ? 'loaded' : 'not found'}');
+  } catch (e) {
+    print('No .env file found, continuing without environment variables');
+  }
   
-  runApp(const MyApp());
+  // Request audio permissions only on mobile platforms
+  if (Platform.isAndroid || Platform.isIOS) {
+    await Permission.microphone.request();
+  }
+  
+  // Set preferred orientations
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+  
+  runApp(MotiAIApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
+class MotiAIApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MotiAI - Wisdom Quotes',
-      debugShowCheckedModeBanner: false,
-      showPerformanceOverlay: false,
-      showSemanticsDebugger: false,
-      debugShowMaterialGrid: false,
+      title: 'MotiAI',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        fontFamily: 'System',
+        primarySwatch: Colors.indigo,
+        brightness: Brightness.dark,
+        fontFamily: 'Inter',
       ),
-      home: const QuoteScreen(),
+      home: QuoteScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
