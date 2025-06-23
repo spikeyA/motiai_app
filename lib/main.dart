@@ -13,20 +13,20 @@ import 'models/quote.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Load environment variables FIRST
+  try {
+    await dotenv.load();
+    print('Loading .env: ${dotenv.env.isNotEmpty ? 'loaded' : 'not found'}');
+  } catch (e) {
+    print('No .env file found, continuing without environment variables');
+  }
+  
   // Initialize Hive
   await Hive.initFlutter();
   Hive.registerAdapter(QuoteAdapter());
   
   // Initialize HiveQuoteService
   await HiveQuoteService.initialize();
-  
-  // Load environment variables
-  try {
-    await dotenv.load();
-    print('Loading .env from: ${dotenv.env['DEEP_AI_API_KEY'] != null ? 'loaded' : 'not found'}');
-  } catch (e) {
-    print('No .env file found, continuing without environment variables');
-  }
   
   // Request audio permissions only on mobile platforms
   if (Platform.isAndroid || Platform.isIOS) {
