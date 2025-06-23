@@ -52,6 +52,10 @@ class HiveQuoteService implements QuoteService {
   
   /// Fetch a quote from DeepAI's text generator API
   static Future<Quote?> fetchQuoteFromDeepAI() async {
+    if (!dotenv.isInitialized) {
+      print('[DeepAI] .env not loaded - skipping API call.');
+      return null;
+    }
     final apiKey = dotenv.env['DEEPAI_API_KEY'];
     if (apiKey == null || apiKey.isEmpty) {
       print('[DeepAI] No API key found for quote generation.');
@@ -105,7 +109,10 @@ class HiveQuoteService implements QuoteService {
     }
     List<Quote> filteredQuotes = allQuotes;
     if (tradition != null) {
-      filteredQuotes = filteredQuotes.where((q) => q.tradition.toLowerCase() == tradition.toLowerCase()).toList();
+      final trimmedTradition = tradition.trim().toLowerCase();
+      filteredQuotes = filteredQuotes.where(
+        (q) => q.tradition.trim().toLowerCase() == trimmedTradition
+      ).toList();
     }
     if (category != null) {
       filteredQuotes = filteredQuotes.where((q) => q.category.toLowerCase() == category.toLowerCase()).toList();
@@ -448,7 +455,10 @@ class HiveQuoteService implements QuoteService {
     }
     List<Quote> filteredQuotes = allQuotes;
     if (tradition != null) {
-      filteredQuotes = filteredQuotes.where((q) => q.tradition.toLowerCase() == tradition.toLowerCase()).toList();
+      final trimmedTradition = tradition.trim().toLowerCase();
+      filteredQuotes = filteredQuotes.where(
+        (q) => q.tradition.trim().toLowerCase() == trimmedTradition
+      ).toList();
     }
     if (category != null) {
       filteredQuotes = filteredQuotes.where((q) => q.category.toLowerCase() == category.toLowerCase()).toList();

@@ -31,6 +31,8 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   int _gradientIndex = 0; // Track current gradient
   bool _isAudioEnabled = true; // Audio toggle state
 
+  String? _selectedTradition; // Track the user's chosen tradition
+
   // Dynamic gradients for different moods
   static const List<List<Color>> _gradients = [
     [Color(0xFFFF6B6B), Color(0xFF4ECDC4), Color(0xFF45B7D1)], // Warm sunset
@@ -68,6 +70,9 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
       ];
     }
   }
+
+  // Track which quotes have been shown for each tradition
+  final Map<String, List<String>> _shownQuotesByTradition = {};
 
   @override
   void initState() {
@@ -179,7 +184,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
       } else {
         quoteToShow = await HiveQuoteService.instance.getRandomQuoteFromLocalOnly(
           category: widget.category,
-          tradition: widget.tradition,
+          tradition: _selectedTradition ?? widget.tradition,
         );
       }
       if (quoteToShow != null) {
@@ -217,13 +222,37 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   }
 
   void _generateQuoteByTradition(String tradition) async {
+    _selectedTradition = tradition;
     _fadeController.reverse().then((_) async {
-      final quote = await HiveQuoteService.instance.getRandomQuote(tradition: tradition);
-      if (quote != null) {
+      // Get all quotes for the chosen tradition
+      final allQuotes = (await HiveQuoteService.instance.getAllQuotes())
+        .where((q) => q.tradition.trim().toLowerCase() == tradition.trim().toLowerCase())
+        .toList();
+      if (allQuotes.isEmpty) {
+        // Should not happen, but fallback to random quote from any tradition
+        final fallback = await HiveQuoteService.instance.getRandomQuoteFromLocalOnly();
         setState(() {
-          _currentQuote = quote;
+          _currentQuote = fallback;
         });
-        print('[QuoteScreen] Showing quote: "${_currentQuote!.text}" - ${_currentQuote!.author} [${_currentQuote!.tradition} / ${_currentQuote!.category}] (id: ${_currentQuote!.id})');
+      } else {
+        // Track shown quotes for this tradition
+        _shownQuotesByTradition[tradition] ??= [];
+        // Filter out already shown quotes
+        final unseen = allQuotes.where((q) => !_shownQuotesByTradition[tradition]!.contains(q.id)).toList();
+        Quote nextQuote;
+        if (unseen.isNotEmpty) {
+          unseen.shuffle();
+          nextQuote = unseen.first;
+        } else {
+          // All quotes shown, reset
+          _shownQuotesByTradition[tradition] = [];
+          allQuotes.shuffle();
+          nextQuote = allQuotes.first;
+        }
+        _shownQuotesByTradition[tradition]!.add(nextQuote.id);
+        setState(() {
+          _currentQuote = nextQuote;
+        });
       }
       _generateBackgroundImage(_currentQuote!);
       _fadeController.forward();
@@ -422,21 +451,24 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     // Tradition Badge
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 8,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: _getTraditionColor(_currentQuote!.tradition),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        _currentQuote!.tradition,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
+                                    GestureDetector(
+                                      onTap: () => _generateQuoteByTradition(_currentQuote!.tradition),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _getTraditionColor(_currentQuote!.tradition),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          _currentQuote!.tradition,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -546,13 +578,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                         'New Quote',
                         style: TextStyle(color: Colors.white),
                       ),
-                    ),
-                    
-                    // Tradition Filter Button
-                    FloatingActionButton(
-                      onPressed: () => _showTraditionDialog(),
-                      backgroundColor: Colors.purple.shade400,
-                      child: const Icon(Icons.filter_list, color: Colors.white),
                     ),
                   ],
                 ),

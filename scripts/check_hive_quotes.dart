@@ -21,11 +21,15 @@ Future<void> main() async {
   final count = quotesBox.length;
   print('📚 Number of quotes in Hive: $count');
 
-  // Optionally, print all quote IDs
-  // for (var quote in quotesBox.values) {
-  //   print(quote);
-  // }
+  // Print all unique traditions and their counts
+  final traditions = <String, int>{};
+  for (var quote in quotesBox.values) {
+    final t = quote.tradition.trim();
+    traditions[t] = (traditions[t] ?? 0) + 1;
+  }
+  print('Traditions in Hive:');
+  traditions.forEach((t, c) => print('  $t: $c'));
 
-  await quotesBox.close();
   print('✅ Done.');
+  await quotesBox.close();
 } 
