@@ -10,6 +10,7 @@ import 'screens/quote_screen.dart';
 import 'services/hive_quote_service.dart';
 import 'services/image_service.dart';
 import 'models/quote.dart';
+import 'services/ai_audio_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,8 +42,28 @@ void main() async {
   // Start pre-fetching images in the background (non-blocking)
   if (dotenv.env['STABILITY_API_KEY'] != null) {
     print('Starting background image pre-fetch...');
-    StabilityAIGenerator.preFetchImages().catchError((e) {
+    StabilityAIGenerator.preFetchImages(
+      onImageGenerated: (String quoteId, String imageData) {
+        // Store the generated image in Hive
+        HiveQuoteService.instance.storeGeneratedImage(quoteId, imageData);
+        print('[Main] Stored pre-fetched image in Hive: $quoteId');
+      },
+    ).catchError((e) {
       print('Background pre-fetch failed: $e');
+    });
+  }
+  
+  // Start pre-generating ambient sounds in the background (non-blocking)
+  if (dotenv.env['ANTHROPIC_API_KEY'] != null) {
+    print('Starting background ambient sound pre-generation...');
+    AIAudioGenerator.preGenerateAmbientSounds(
+      onAudioGenerated: (String audioId, String audioData) {
+        // Store the generated audio in Hive
+        HiveQuoteService.instance.storeGeneratedAudio(audioId, audioData);
+        print('[Main] Stored pre-generated audio in Hive: $audioId');
+      },
+    ).catchError((e) {
+      print('Background audio pre-generation failed: $e');
     });
   }
   

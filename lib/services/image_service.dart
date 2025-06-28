@@ -79,7 +79,7 @@ class StabilityAIGenerator {
   }
   
   /// Pre-fetch images for common traditions in the background
-  static Future<void> preFetchImages() async {
+  static Future<void> preFetchImages({Function(String quoteId, String imageData)? onImageGenerated}) async {
     print('[StabilityAI] Starting background image pre-fetch...');
     final traditions = [
       'Buddhist Inspiration', 
@@ -94,30 +94,54 @@ class StabilityAIGenerator {
     ];
     
     for (final tradition in traditions) {
-      final prompt = buildPrompt(tradition);
-      final cacheKey = _generateCacheKey(prompt);
+      print('[StabilityAI] Generating 8 images for $tradition...');
       
-      // Only pre-fetch if not already cached
-      if (!_imageCache.containsKey(cacheKey)) {
-        print('[StabilityAI] Pre-fetching image for $tradition...');
-        try {
-          final image = await _generateNewImage(prompt);
-          if (image != null && !image.contains('unsplash.com')) {
-            _imageCache[cacheKey] = image;
-            _cacheTimestamps[cacheKey] = DateTime.now();
-            await _saveImageToStorage(cacheKey, image);
-            print('[StabilityAI] Pre-fetched AI image for $tradition');
-          } else {
-            print('[StabilityAI] Skipped pre-fetch for $tradition (fallback image)');
+      // Generate 8 unique images for each tradition
+      for (int i = 1; i <= 8; i++) {
+        final prompt = buildPrompt(tradition, variation: i);
+        final cacheKey = _generateCacheKey(prompt);
+        
+        // Only pre-fetch if not already cached
+        if (!_imageCache.containsKey(cacheKey)) {
+          print('[StabilityAI] Pre-fetching image $i/8 for $tradition...');
+          try {
+            final image = await _generateNewImage(prompt);
+            if (image != null && !image.contains('unsplash.com')) {
+              _imageCache[cacheKey] = image;
+              _cacheTimestamps[cacheKey] = DateTime.now();
+              await _saveImageToStorage(cacheKey, image);
+              
+              // Store in Hive with a unique quote ID for this tradition
+              final quoteId = '${tradition.toLowerCase().replaceAll(' ', '_')}_image_$i';
+              if (onImageGenerated != null) {
+                onImageGenerated(quoteId, image);
+                print('[StabilityAI] Stored image $i/8 for $tradition in Hive with ID: $quoteId');
+              }
+              
+              print('[StabilityAI] Pre-fetched AI image $i/8 for $tradition');
+              
+              // Add delay between requests to avoid rate limiting
+              if (i < 8) {
+                await Future.delayed(Duration(milliseconds: 1000));
+              }
+            } else {
+              print('[StabilityAI] Skipped pre-fetch for $tradition image $i (fallback image)');
+            }
+          } catch (e) {
+            print('[StabilityAI] Failed to pre-fetch image $i for $tradition: $e');
           }
-        } catch (e) {
-          print('[StabilityAI] Failed to pre-fetch image for $tradition: $e');
+        } else {
+          print('[StabilityAI] Using cached image $i/8 for $tradition');
         }
-      } else {
-        print('[StabilityAI] Using cached image for $tradition');
+      }
+      
+      // Add delay between traditions
+      if (tradition != traditions.last) {
+        print('[StabilityAI] Completed $tradition, moving to next tradition...');
+        await Future.delayed(Duration(milliseconds: 2000));
       }
     }
-    print('[StabilityAI] Background pre-fetch completed');
+    print('[StabilityAI] Background pre-fetch completed - 8 images per tradition');
   }
   
   /// Clear expired cache entries
@@ -326,29 +350,129 @@ class StabilityAIGenerator {
   }
 }
 
-String buildPrompt(String theme) {
+String buildPrompt(String theme, {int variation = 1}) {
   // Create more aesthetic and specific prompts for beautiful AI-generated backgrounds
   final tradition = theme.toLowerCase();
   
   if (tradition.contains('buddhist')) {
-    return "beautiful peaceful buddhist temple at golden hour, soft warm lighting, meditation atmosphere, ethereal glow, minimalist composition, perfect for text overlay, high quality, artistic, serene";
+    final variations = [
+      "beautiful peaceful buddhist temple at golden hour, soft warm lighting, meditation atmosphere, ethereal glow, minimalist composition, perfect for text overlay, high quality, artistic, serene",
+      "majestic buddhist monastery in misty mountains, soft dawn light, spiritual tranquility, flowing prayer flags, ethereal atmosphere, perfect for text overlay, high quality, artistic, peaceful",
+      "serene buddhist garden with lotus pond, gentle morning light, meditation stones, flowing water, zen atmosphere, perfect for text overlay, high quality, artistic, contemplative",
+      "ancient buddhist temple at sunset, warm orange glow, spiritual energy, intricate architecture, peaceful atmosphere, perfect for text overlay, high quality, artistic, sacred",
+      "buddhist meditation hall with candles, soft ambient lighting, spiritual serenity, minimalist design, warm atmosphere, perfect for text overlay, high quality, artistic, calming",
+      "buddhist mountain retreat, misty peaks, spiritual solitude, natural beauty, ethereal lighting, perfect for text overlay, high quality, artistic, transcendent",
+      "buddhist prayer wheel garden, golden light, spiritual devotion, flowing movement, peaceful atmosphere, perfect for text overlay, high quality, artistic, reverent",
+      "buddhist temple courtyard, cherry blossoms, spiritual harmony, natural elements, soft lighting, perfect for text overlay, high quality, artistic, harmonious"
+    ];
+    return variations[variation - 1];
   } else if (tradition.contains('sufi')) {
-    return "mystical sufi desert landscape at sunset, warm golden and purple hues, spiritual atmosphere, flowing sand dunes, ethereal lighting, perfect for text overlay, high quality, artistic, dreamy";
+    final variations = [
+      "mystical sufi desert landscape at sunset, warm golden and purple hues, spiritual atmosphere, flowing sand dunes, ethereal lighting, perfect for text overlay, high quality, artistic, dreamy",
+      "sufi whirling dervish in desert, flowing robes, spiritual ecstasy, warm earth tones, mystical atmosphere, perfect for text overlay, high quality, artistic, transcendent",
+      "ancient sufi mosque at dawn, soft pink light, spiritual devotion, intricate geometric patterns, peaceful atmosphere, perfect for text overlay, high quality, artistic, sacred",
+      "sufi garden with roses, mystical moonlight, spiritual love, flowing water, ethereal atmosphere, perfect for text overlay, high quality, artistic, romantic",
+      "sufi desert oasis, palm trees, spiritual refuge, warm sunset colors, peaceful atmosphere, perfect for text overlay, high quality, artistic, welcoming",
+      "sufi calligraphy on silk, flowing ink, spiritual wisdom, golden background, mystical atmosphere, perfect for text overlay, high quality, artistic, profound",
+      "sufi meditation space, candlelight, spiritual depth, warm earth tones, contemplative atmosphere, perfect for text overlay, high quality, artistic, introspective",
+      "sufi mountain retreat, misty peaks, spiritual solitude, ethereal light, transcendent atmosphere, perfect for text overlay, high quality, artistic, elevated"
+    ];
+    return variations[variation - 1];
   } else if (tradition.contains('zen')) {
-    return "serene zen garden with cherry blossoms, soft natural lighting, peaceful atmosphere, flowing water elements, minimalist design, perfect for text overlay, high quality, artistic, tranquil";
+    final variations = [
+      "serene zen garden with cherry blossoms, soft natural lighting, peaceful atmosphere, flowing water elements, minimalist design, perfect for text overlay, high quality, artistic, tranquil",
+      "zen meditation room, tatami mats, soft diffused light, spiritual simplicity, minimalist beauty, perfect for text overlay, high quality, artistic, contemplative",
+      "zen rock garden, raked sand, spiritual harmony, natural stones, peaceful atmosphere, perfect for text overlay, high quality, artistic, balanced",
+      "zen tea ceremony room, warm wood tones, spiritual ritual, soft lighting, harmonious atmosphere, perfect for text overlay, high quality, artistic, mindful",
+      "zen mountain temple, misty peaks, spiritual solitude, natural beauty, ethereal atmosphere, perfect for text overlay, high quality, artistic, elevated",
+      "zen bamboo forest, gentle swaying, spiritual peace, natural green tones, calming atmosphere, perfect for text overlay, high quality, artistic, natural",
+      "zen water feature, flowing stream, spiritual flow, natural elements, peaceful atmosphere, perfect for text overlay, high quality, artistic, fluid",
+      "zen meditation platform, overlooking valley, spiritual perspective, natural landscape, contemplative atmosphere, perfect for text overlay, high quality, artistic, expansive"
+    ];
+    return variations[variation - 1];
   } else if (tradition.contains('taoism')) {
-    return "harmonious taoist mountain landscape with mist, flowing waterfalls, natural balance, soft earth and green tones, ethereal atmosphere, perfect for text overlay, high quality, artistic, balanced";
+    final variations = [
+      "harmonious taoist mountain landscape with mist, flowing waterfalls, natural balance, soft earth and green tones, ethereal atmosphere, perfect for text overlay, high quality, artistic, balanced",
+      "taoist temple in mountains, misty peaks, spiritual harmony, natural elements, peaceful atmosphere, perfect for text overlay, high quality, artistic, harmonious",
+      "taoist yin yang symbol, flowing energy, spiritual balance, contrasting elements, dynamic atmosphere, perfect for text overlay, high quality, artistic, balanced",
+      "taoist garden with flowing water, natural harmony, spiritual peace, organic forms, calming atmosphere, perfect for text overlay, high quality, artistic, flowing",
+      "taoist mountain path, winding trail, spiritual journey, natural beauty, contemplative atmosphere, perfect for text overlay, high quality, artistic, journeying",
+      "taoist meditation space, natural materials, spiritual simplicity, warm earth tones, peaceful atmosphere, perfect for text overlay, high quality, artistic, simple",
+      "taoist waterfall, flowing energy, spiritual power, natural force, dynamic atmosphere, perfect for text overlay, high quality, artistic, powerful",
+      "taoist forest clearing, natural sanctuary, spiritual refuge, organic beauty, peaceful atmosphere, perfect for text overlay, high quality, artistic, sanctuary"
+    ];
+    return variations[variation - 1];
   } else if (tradition.contains('stoicism')) {
-    return "majestic stoic architecture with classical columns, dignified atmosphere, warm stone tones, dramatic lighting, strong composition, perfect for text overlay, high quality, artistic, powerful";
+    final variations = [
+      "majestic stoic architecture with classical columns, dignified atmosphere, warm stone tones, dramatic lighting, strong composition, perfect for text overlay, high quality, artistic, powerful",
+      "ancient roman forum, stoic wisdom, classical beauty, warm stone architecture, dignified atmosphere, perfect for text overlay, high quality, artistic, timeless",
+      "stoic philosopher's study, warm wood tones, intellectual depth, classical elements, contemplative atmosphere, perfect for text overlay, high quality, artistic, thoughtful",
+      "classical marble statue, stoic strength, timeless beauty, warm lighting, dignified atmosphere, perfect for text overlay, high quality, artistic, enduring",
+      "ancient library, stoic knowledge, classical architecture, warm ambient light, intellectual atmosphere, perfect for text overlay, high quality, artistic, learned",
+      "stoic meditation space, simple design, spiritual strength, warm earth tones, contemplative atmosphere, perfect for text overlay, high quality, artistic, resilient",
+      "classical temple ruins, stoic endurance, timeless wisdom, warm sunset light, dignified atmosphere, perfect for text overlay, high quality, artistic, enduring",
+      "ancient amphitheater, stoic grandeur, classical beauty, dramatic lighting, powerful atmosphere, perfect for text overlay, high quality, artistic, grand"
+    ];
+    return variations[variation - 1];
   } else if (tradition.contains('hinduism')) {
-    return "sacred hindu temple with spiritual energy, vibrant colors, divine atmosphere, intricate details, warm lighting, perfect for text overlay, high quality, artistic, sacred";
+    final variations = [
+      "sacred hindu temple with spiritual energy, vibrant colors, divine atmosphere, intricate details, warm lighting, perfect for text overlay, high quality, artistic, sacred",
+      "hindu temple at sunrise, golden light, spiritual awakening, intricate carvings, divine atmosphere, perfect for text overlay, high quality, artistic, awakening",
+      "hindu meditation space, sacred geometry, spiritual depth, warm earth tones, contemplative atmosphere, perfect for text overlay, high quality, artistic, profound",
+      "hindu temple courtyard, sacred fire, spiritual purification, warm orange glow, divine atmosphere, perfect for text overlay, high quality, artistic, purifying",
+      "hindu mountain temple, misty peaks, spiritual elevation, natural beauty, ethereal atmosphere, perfect for text overlay, high quality, artistic, elevated",
+      "hindu sacred river, flowing water, spiritual cleansing, natural elements, divine atmosphere, perfect for text overlay, high quality, artistic, cleansing",
+      "hindu temple bells, sacred sound, spiritual vibration, golden light, divine atmosphere, perfect for text overlay, high quality, artistic, resonant",
+      "hindu meditation garden, sacred flowers, spiritual beauty, natural harmony, peaceful atmosphere, perfect for text overlay, high quality, artistic, beautiful"
+    ];
+    return variations[variation - 1];
   } else if (tradition.contains('indigenous')) {
-    return "sacred indigenous landscape with natural elements, earth tones, spiritual connection, organic forms, warm lighting, perfect for text overlay, high quality, artistic, connected";
+    final variations = [
+      "sacred indigenous landscape with natural elements, earth tones, spiritual connection, organic forms, warm lighting, perfect for text overlay, high quality, artistic, connected",
+      "indigenous sacred circle, natural stones, spiritual ceremony, earth elements, warm atmosphere, perfect for text overlay, high quality, artistic, ceremonial",
+      "indigenous medicine wheel, natural materials, spiritual wisdom, earth tones, harmonious atmosphere, perfect for text overlay, high quality, artistic, wise",
+      "indigenous sweat lodge, natural materials, spiritual purification, warm earth tones, sacred atmosphere, perfect for text overlay, high quality, artistic, purifying",
+      "indigenous sacred mountain, natural beauty, spiritual power, earth elements, powerful atmosphere, perfect for text overlay, high quality, artistic, powerful",
+      "indigenous sacred water, flowing stream, spiritual life, natural elements, life-giving atmosphere, perfect for text overlay, high quality, artistic, life-giving",
+      "indigenous sacred fire, natural flame, spiritual transformation, warm light, transformative atmosphere, perfect for text overlay, high quality, artistic, transformative",
+      "indigenous sacred tree, natural wisdom, spiritual growth, organic beauty, growing atmosphere, perfect for text overlay, high quality, artistic, growing"
+    ];
+    return variations[variation - 1];
   } else if (tradition.contains('mindful')) {
-    return "modern mindful technology landscape, clean lines, peaceful atmosphere, soft blue and white tones, minimalist design, perfect for text overlay, high quality, artistic, modern";
+    final variations = [
+      "modern mindful technology landscape, clean lines, peaceful atmosphere, soft blue and white tones, minimalist design, perfect for text overlay, high quality, artistic, modern",
+      "mindful digital workspace, clean interface, peaceful productivity, soft lighting, modern atmosphere, perfect for text overlay, high quality, artistic, productive",
+      "mindful meditation app interface, clean design, spiritual technology, soft colors, peaceful atmosphere, perfect for text overlay, high quality, artistic, mindful",
+      "mindful smart home, clean technology, peaceful living, soft ambient light, harmonious atmosphere, perfect for text overlay, high quality, artistic, harmonious",
+      "mindful digital garden, clean visualization, peaceful growth, soft green tones, growing atmosphere, perfect for text overlay, high quality, artistic, growing",
+      "mindful virtual reality, clean immersion, peaceful escape, soft ethereal light, immersive atmosphere, perfect for text overlay, high quality, artistic, immersive",
+      "mindful artificial intelligence, clean algorithms, peaceful intelligence, soft blue glow, intelligent atmosphere, perfect for text overlay, high quality, artistic, intelligent",
+      "mindful digital sanctuary, clean space, peaceful refuge, soft white light, sanctuary atmosphere, perfect for text overlay, high quality, artistic, sanctuary"
+    ];
+    return variations[variation - 1];
   } else if (tradition.contains('social')) {
-    return "abstract community unity landscape, warm sunset colors, flowing organic shapes, no text or words, peaceful atmosphere, soft gradients, perfect for text overlay, high quality, artistic, inclusive";
+    final variations = [
+      "abstract community unity landscape, warm sunset colors, flowing organic shapes, no text or words, peaceful atmosphere, soft gradients, perfect for text overlay, high quality, artistic, inclusive",
+      "diverse community gathering, warm colors, social harmony, inclusive design, welcoming atmosphere, perfect for text overlay, high quality, artistic, welcoming",
+      "social justice march, warm solidarity, collective strength, inclusive movement, powerful atmosphere, perfect for text overlay, high quality, artistic, powerful",
+      "community garden, warm earth tones, social growth, inclusive nature, growing atmosphere, perfect for text overlay, high quality, artistic, growing",
+      "intercultural celebration, warm diversity, social harmony, inclusive joy, celebratory atmosphere, perfect for text overlay, high quality, artistic, celebratory",
+      "community support network, warm connection, social care, inclusive support, caring atmosphere, perfect for text overlay, high quality, artistic, caring",
+      "social equality symbol, warm justice, collective rights, inclusive fairness, just atmosphere, perfect for text overlay, high quality, artistic, just",
+      "community healing circle, warm compassion, social healing, inclusive care, healing atmosphere, perfect for text overlay, high quality, artistic, healing"
+    ];
+    return variations[variation - 1];
   } else {
-    return "beautiful spiritual background, soft ethereal lighting, peaceful atmosphere, minimalist composition, perfect for text overlay, high quality, artistic, inspiring";
+    final variations = [
+      "beautiful spiritual background, soft ethereal lighting, peaceful atmosphere, minimalist composition, perfect for text overlay, high quality, artistic, inspiring",
+      "serene meditation space, soft natural light, peaceful atmosphere, simple design, perfect for text overlay, high quality, artistic, calming",
+      "sacred temple interior, soft candlelight, spiritual atmosphere, warm tones, perfect for text overlay, high quality, artistic, sacred",
+      "peaceful mountain landscape, soft dawn light, natural beauty, ethereal atmosphere, perfect for text overlay, high quality, artistic, natural",
+      "spiritual sanctuary, soft ambient lighting, peaceful refuge, warm atmosphere, perfect for text overlay, high quality, artistic, sanctuary",
+      "meditation garden, soft natural elements, peaceful harmony, organic beauty, perfect for text overlay, high quality, artistic, harmonious",
+      "sacred geometry, soft geometric patterns, spiritual wisdom, balanced composition, perfect for text overlay, high quality, artistic, wise",
+      "ethereal light portal, soft divine glow, spiritual transcendence, mystical atmosphere, perfect for text overlay, high quality, artistic, transcendent"
+    ];
+    return variations[variation - 1];
   }
 } 
