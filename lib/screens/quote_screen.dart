@@ -472,8 +472,12 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                   child: Container(
                                     padding: const EdgeInsets.all(24),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.08),
+                                      color: Colors.transparent,
                                       borderRadius: BorderRadius.circular(32),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.2),
+                                        width: 1,
+                                      ),
                                     ),
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
@@ -484,9 +488,26 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                           style: TextStyle(
                                             fontSize: 24,
                                             fontWeight: FontWeight.w300,
-                                            height: 1.4,
-                                            color: _textColor,
-                                            shadows: _textShadows,
+                                            height: 1.5,
+                                            color: Colors.black87,
+                                            letterSpacing: 0.5,
+                                            shadows: [
+                                              Shadow(
+                                                blurRadius: 16,
+                                                color: Colors.white,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                              Shadow(
+                                                blurRadius: 12,
+                                                color: Colors.white70,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                              Shadow(
+                                                blurRadius: 8,
+                                                color: Colors.white54,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ],
                                           ),
                                           textAlign: TextAlign.center,
                                         ),
@@ -497,10 +518,27 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                           _currentQuote!.author,
                                           style: TextStyle(
                                             fontSize: 18,
-                                            fontWeight: FontWeight.w500,
-                                            color: _textColor.withOpacity(0.85),
+                                            fontWeight: FontWeight.w400,
+                                            color: Colors.black87,
                                             fontStyle: FontStyle.italic,
-                                            shadows: _textShadows,
+                                            letterSpacing: 1.0,
+                                            shadows: [
+                                              Shadow(
+                                                blurRadius: 12,
+                                                color: Colors.white,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                              Shadow(
+                                                blurRadius: 8,
+                                                color: Colors.white70,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                              Shadow(
+                                                blurRadius: 4,
+                                                color: Colors.white54,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                         const SizedBox(height: 16),
@@ -510,9 +548,26 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                           _currentQuote!.tradition,
                                           style: TextStyle(
                                             fontSize: 14,
-                                            color: _textColor.withOpacity(0.7),
-                                            fontWeight: FontWeight.w400,
-                                            shadows: _textShadows,
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w300,
+                                            letterSpacing: 0.8,
+                                            shadows: [
+                                              Shadow(
+                                                blurRadius: 10,
+                                                color: Colors.white,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                              Shadow(
+                                                blurRadius: 6,
+                                                color: Colors.white70,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                              Shadow(
+                                                blurRadius: 3,
+                                                color: Colors.white54,
+                                                offset: const Offset(0, 0.5),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                         const SizedBox(height: 20),
@@ -525,7 +580,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                             return IconButton(
                                               icon: Icon(
                                                 isFavorited ? Icons.favorite : Icons.favorite_border,
-                                                color: isFavorited ? Colors.red.shade400 : _textColor.withOpacity(0.8),
+                                                color: isFavorited ? Colors.red.shade400 : Colors.black87,
                                                 size: 28,
                                               ),
                                               onPressed: () => _toggleFavorite(_currentQuote!),
