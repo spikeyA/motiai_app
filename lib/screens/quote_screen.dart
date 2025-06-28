@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../services/hive_quote_service.dart';
 import '../services/quote_service.dart';
@@ -29,7 +30,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   late Animation<double> _scaleAnimation;
 
   String? _backgroundImageUrl;
-  bool _isLoadingImage = false;
   int _gradientIndex = 0; // Track current gradient
   bool _isAudioEnabled = true; // Audio toggle state
 
@@ -75,6 +75,9 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
 
   // Track which quotes have been shown for each tradition
   final Map<String, List<String>> _shownQuotesByTradition = {};
+
+  Timer? _gradientTimer;
+  Timer? _quoteTimer;
 
   @override
   void initState() {
@@ -133,7 +136,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
 
   Future<void> _generateBackgroundImage(Quote quote) async {
     setState(() {
-      _isLoadingImage = true;
       _backgroundImageUrl = null;
       // Set random gradient for new quotes
       _gradientIndex = DateTime.now().millisecondsSinceEpoch % _gradients.length;
@@ -144,25 +146,40 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
       await AudioService.playAmbience(quote.tradition);
     }
     
-    // Clear cached Social Justice images to force regeneration with new prompt
-    if (quote.tradition.toLowerCase().contains('social')) {
-      await StabilityAIGenerator.clearCachedImagesForTheme("Social Justice");
-    }
-    
-    // Check if we have a stored image for this quote
+    // First, check if we have a stored image for this specific quote
     final storedImage = HiveQuoteService.instance.getStoredImage(quote.id);
     if (storedImage != null) {
       print('[QuoteScreen] Using stored image for quote: ${quote.id}');
       setState(() {
         _backgroundImageUrl = storedImage;
-        _isLoadingImage = false;
       });
       return;
     }
     
-    final prompt = buildPrompt("${quote.tradition} ${quote.category}");
+    // If no quote-specific image, try to get a pre-generated image for this tradition
+    final traditionKey = quote.tradition.toLowerCase().replaceAll(' ', '_');
+    final randomVariation = (DateTime.now().millisecondsSinceEpoch % 8) + 1;
+    final preGeneratedImageKey = '${traditionKey}_image_$randomVariation';
+    
+    final preGeneratedImage = HiveQuoteService.instance.getStoredImage(preGeneratedImageKey);
+    if (preGeneratedImage != null) {
+      print('[QuoteScreen] Using pre-generated image for tradition: $preGeneratedImageKey');
+      setState(() {
+        _backgroundImageUrl = preGeneratedImage;
+      });
+      // Store this image for the current quote for future use
+      HiveQuoteService.instance.storeGeneratedImage(quote.id, preGeneratedImage);
+      print('[QuoteScreen] Stored pre-generated image for quote: ${quote.id}');
+      return;
+    }
+    
+    // If no pre-generated image available, generate a new one
+    // Use random variation (1-8) for variety
+    final random = DateTime.now().millisecondsSinceEpoch;
+    final variation = (random % 8) + 1;
+    final prompt = buildPrompt("${quote.tradition} ${quote.category}", variation: variation);
     print('[QuoteScreen] Generating background for: ${quote.tradition} ${quote.category}');
-    print('[QuoteScreen] Using prompt: $prompt');
+    print('[QuoteScreen] Using prompt variation $variation: $prompt');
     final url = await StabilityAIGenerator.generateImage(prompt);
     print('[QuoteScreen] Received image URL: ${url?.substring(0, url.length > 50 ? 50 : url.length)}...');
     
@@ -177,7 +194,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
         _backgroundImageUrl = null; // Use gradient background
         print('[QuoteScreen] Using gradient background instead of fallback image');
       }
-      _isLoadingImage = false;
     });
   }
 
@@ -209,19 +225,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
     setState(() {
       HiveQuoteService.useAIQuotes = !HiveQuoteService.useAIQuotes;
     });
-    
-    // Show feedback to user
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          HiveQuoteService.useAIQuotes 
-            ? 'AI quotes enabled - will try AI first, then local' 
-            : 'AI quotes disabled - using local quotes only',
-        ),
-        duration: const Duration(seconds: 2),
-        backgroundColor: HiveQuoteService.useAIQuotes ? Colors.green : Colors.orange,
-      ),
-    );
   }
 
   void _generateNewQuote() async {
@@ -253,14 +256,13 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   }
 
   void _shareQuote() {
-    final quoteText = '"${_currentQuote!.text}"\n- ${_currentQuote!.author}';
+    final quoteText = '${_currentQuote!.text} - ${_currentQuote!.author}';
     Clipboard.setData(ClipboardData(text: quoteText));
     
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Quote copied to clipboard!'),
         duration: Duration(seconds: 2),
-        backgroundColor: Colors.green,
       ),
     );
   }
@@ -331,13 +333,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    if (_currentQuote == null) {
-      return Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
     // Log the source for debugging, but do not show in UI
     final actualSource = HiveQuoteService.useAIQuotes ? 'AI' : 'Local';
     print('[QuoteScreen] Source: $actualSource');
@@ -367,18 +362,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                   : const SizedBox.shrink(),
             ),
           ),
-          // Loading spinner overlay
-          if (_isLoadingImage)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withOpacity(0.2),
-                child: Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(_textColor),
-                  ),
-                ),
-              ),
-            ),
           // Main content
           SafeArea(
             child: ListView(

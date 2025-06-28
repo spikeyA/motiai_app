@@ -1,5 +1,7 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'dart:async';
+import 'hive_quote_service.dart';
+import 'dart:convert';
 
 class AudioService {
   static AudioPlayer? _currentPlayer;
@@ -7,6 +9,7 @@ class AudioService {
   static Timer? _audioTimer;
   static const int _audioIntervalSeconds = 30; // 30-second intervals
   static String? _currentAudioFilePath; // Track current audio file
+  static String? _currentAudioId; // Track current AI audio ID
 
   // Audio files for each tradition
   static const Map<String, String> _ambienceSounds = {
@@ -40,12 +43,74 @@ class AudioService {
       // Stop any currently playing audio
       await stopAmbience();
 
-      // Get the appropriate audio file
-      String audioFile = _getAudioFile(tradition);
-      _currentAudioFilePath = audioFile; // Store current file path
+      // First, try to get AI-generated audio from Hive
+      final aiAudioId = _generateAIAudioId(tradition);
+      final aiAudioData = HiveQuoteService.instance.getStoredAudio(aiAudioId);
       
-      print('[Audio] Playing ambience for $tradition: $audioFile');
-
+      if (aiAudioData != null && aiAudioData.startsWith('data:audio/')) {
+        // Use AI-generated audio
+        print('[Audio] Using AI-generated audio for $tradition: $aiAudioId');
+        await _playAIAudio(aiAudioData, aiAudioId);
+      } else {
+        // Fall back to local audio files
+        String audioFile = _getAudioFile(tradition);
+        _currentAudioFilePath = audioFile;
+        print('[Audio] Using local audio for $tradition: $audioFile');
+        await _playLocalAudio(audioFile);
+      }
+    } catch (e) {
+      print('[Audio] Error playing ambience: $e');
+      // Don't throw error - audio is optional
+    }
+  }
+  
+  /// Play AI-generated audio
+  static Future<void> _playAIAudio(String audioData, String audioId) async {
+    try {
+      _currentAudioId = audioId;
+      
+      // Create new audio player
+      _currentPlayer = AudioPlayer();
+      
+      // Set audio mode for background playback
+      await _currentPlayer!.setReleaseMode(ReleaseMode.loop);
+      
+      // Convert base64 to bytes and play
+      final data = audioData.split(',')[1];
+      final bytes = base64Decode(data);
+      await _currentPlayer!.play(BytesSource(bytes));
+      _isPlaying = true;
+      
+      // Start 30-second timer
+      _startAudioTimer();
+      
+      print('[Audio] AI ambience started successfully - will loop every $_audioIntervalSeconds seconds');
+    } catch (e) {
+      print('[Audio] Error playing AI audio: $e');
+      // Fall back to local audio - extract tradition from audioId
+      final tradition = _extractTraditionFromAudioId(audioId);
+      String audioFile = _getAudioFile(tradition);
+      await _playLocalAudio(audioFile);
+    }
+  }
+  
+  /// Extract tradition from AI audio ID
+  static String _extractTraditionFromAudioId(String audioId) {
+    // Convert audioId like 'ai_audio_buddhist_inspiration' back to 'Buddhist Inspiration'
+    final parts = audioId.replaceFirst('ai_audio_', '').split('_');
+    if (parts.length >= 2) {
+      final tradition = parts[0].substring(0, 1).toUpperCase() + parts[0].substring(1);
+      final category = parts[1].substring(0, 1).toUpperCase() + parts[1].substring(1);
+      return '$tradition $category';
+    }
+    return 'Zen'; // Default fallback
+  }
+  
+  /// Play local audio file
+  static Future<void> _playLocalAudio(String audioFile) async {
+    try {
+      _currentAudioFilePath = audioFile;
+      
       // Create new audio player
       _currentPlayer = AudioPlayer();
       
@@ -55,15 +120,19 @@ class AudioService {
       // Play the audio
       await _currentPlayer!.play(AssetSource(audioFile));
       _isPlaying = true;
-
+      
       // Start 30-second timer
       _startAudioTimer();
-
-      print('[Audio] Ambience started successfully - will loop every $_audioIntervalSeconds seconds');
+      
+      print('[Audio] Local ambience started successfully - will loop every $_audioIntervalSeconds seconds');
     } catch (e) {
-      print('[Audio] Error playing ambience: $e');
-      // Don't throw error - audio is optional
+      print('[Audio] Error playing local audio: $e');
     }
+  }
+  
+  /// Generate AI audio ID for tradition
+  static String _generateAIAudioId(String tradition) {
+    return 'ai_audio_${tradition.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
   }
 
   /// Start the audio timer for 30-second intervals
@@ -82,10 +151,23 @@ class AudioService {
   /// Restart the current audio
   static Future<void> _restartAudio() async {
     try {
-      if (_currentPlayer != null && _isPlaying && _currentAudioFilePath != null) {
+      if (_currentPlayer != null && _isPlaying) {
         await _currentPlayer!.stop();
-        await _currentPlayer!.play(AssetSource(_currentAudioFilePath!));
-        print('[Audio] Audio restarted successfully: $_currentAudioFilePath');
+        
+        if (_currentAudioId != null) {
+          // Restart AI audio
+          final aiAudioData = HiveQuoteService.instance.getStoredAudio(_currentAudioId!);
+          if (aiAudioData != null) {
+            final data = aiAudioData.split(',')[1];
+            final bytes = base64Decode(data);
+            await _currentPlayer!.play(BytesSource(bytes));
+            print('[Audio] AI audio restarted successfully: $_currentAudioId');
+          }
+        } else if (_currentAudioFilePath != null) {
+          // Restart local audio
+          await _currentPlayer!.play(AssetSource(_currentAudioFilePath!));
+          print('[Audio] Local audio restarted successfully: $_currentAudioFilePath');
+        }
       }
     } catch (e) {
       print('[Audio] Error restarting audio: $e');
@@ -98,6 +180,7 @@ class AudioService {
       _audioTimer?.cancel();
       _audioTimer = null;
       _currentAudioFilePath = null;
+      _currentAudioId = null;
       
       if (_currentPlayer != null && _isPlaying) {
         await _currentPlayer!.stop();
@@ -168,6 +251,7 @@ class AudioService {
     _audioTimer?.cancel();
     _audioTimer = null;
     _currentAudioFilePath = null;
+    _currentAudioId = null;
     await stopAmbience();
   }
 } 

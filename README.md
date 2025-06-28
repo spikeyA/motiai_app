@@ -7,14 +7,16 @@ A beautiful Flutter macOS app that displays motivational quotes from Buddhist, S
 - **Wisdom Quotes**: Curated collection of inspirational quotes from 9 spiritual traditions
 - **AI-Generated Quotes**: Unique, AI-generated quotes using Anthropic Claude API with authentic author names
 - **AI-Generated Backgrounds**: Beautiful, AI-generated background images using Stability AI (Stable Diffusion)
+- **AI-Generated Audio**: Ambient sounds generated using Anthropic Claude TTS with fallback to local audio
 - **Glassmorphism UI**: Modern, transparent glass-like quote cards with backdrop blur effects
 - **Dynamic Gradient Backgrounds**: 8 beautiful gradient combinations as fallback backgrounds
 - **Audio Ambience**: Tradition-specific ambient sounds that play automatically with each quote
 - **Favorite Quotes**: Heart button to save and manage your favorite quotes with persistent local storage
 - **Quote Sharing**: Share inspirational quotes with others via clipboard
 - **Smooth Animations**: Elegant fade and scale animations for quote transitions
-- **AI Image Caching**: AI-generated images are cached locally for faster loading
+- **Hive Database**: Efficient local storage for quotes, images, and audio using Hive
 - **Smart Fallbacks**: Graceful fallback to gradient backgrounds when AI images aren't available
+- **Background Pre-generation**: AI images and audio are pre-generated for all traditions
 
 ## 🧘‍♀️ Spiritual Traditions
 
@@ -50,6 +52,7 @@ The app uses **Stability AI (Stable Diffusion)** to generate beautiful, traditio
 - **Smart Caching**: Images are cached locally for instant loading
 - **Automatic Storage**: AI images are stored in Hive database for persistence
 - **Graceful Fallbacks**: Falls back to beautiful gradient backgrounds when AI isn't available
+- **Pre-generation**: 8 unique images per tradition are generated and cached
 
 ### **Background Prompts:**
 - **Buddhist**: Peaceful temples with golden hour lighting
@@ -65,6 +68,12 @@ The app uses **Stability AI (Stable Diffusion)** to generate beautiful, traditio
 ## 🎵 Audio Ambience
 
 The app features tradition-specific ambient sounds that enhance the meditation experience:
+
+### **AI-Generated Audio:**
+- **Anthropic Claude TTS**: Generates unique ambient sound descriptions for each tradition
+- **11 Variations per Tradition**: Multiple audio variations for variety
+- **Fallback System**: Falls back to local audio files when AI generation fails
+- **Hive Storage**: All AI-generated audio is stored locally for instant playback
 
 ### **Tradition-Specific Sounds:**
 - **Buddhist**: Meditation bells for spiritual awakening
@@ -101,7 +110,7 @@ The app features 8 carefully crafted gradient combinations as fallback backgroun
 - Flutter 3.32.4 or higher
 - Dart 3.8.1 or higher
 - macOS 10.15 or higher
-- Anthropic API key (optional - for AI-generated quotes)
+- Anthropic API key (optional - for AI-generated quotes and audio)
 - Stability AI API key (optional - for AI-generated backgrounds)
 
 ## 🚀 Setup Instructions
@@ -119,7 +128,7 @@ flutter pub get
 
 ### 3. Configure Environment Variables (Optional)
 
-The app works perfectly with beautiful gradient backgrounds even without API keys. If you want AI-generated quotes and images:
+The app works perfectly with beautiful gradient backgrounds even without API keys. If you want AI-generated quotes, images, and audio:
 
 #### Create .env file
 Create a `.env` file in the `motiai_app` directory:
@@ -130,7 +139,7 @@ STABILITY_API_KEY=your_stability_ai_api_key_here
 
 ### 4. Get Your API Keys (Optional)
 
-#### For AI-Generated Quotes (Anthropic Claude):
+#### For AI-Generated Quotes and Audio (Anthropic Claude):
 1. Sign up for an account at [console.anthropic.com](https://console.anthropic.com)
 2. Navigate to API Keys section
 3. Create a new API key
@@ -159,7 +168,8 @@ flutter run -d macos
 ### AI Features
 - **AI Quotes**: When enabled, generates unique quotes with authentic author names
 - **AI Backgrounds**: Automatically generates tradition-specific background images
-- **Smart Caching**: AI images are cached for faster loading on subsequent views
+- **AI Audio**: Generates unique ambient sounds for each tradition
+- **Smart Caching**: AI content is cached for faster loading on subsequent views
 - **Automatic Storage**: All AI-generated content is stored locally in Hive database
 
 ## 📁 Project Structure
@@ -170,12 +180,20 @@ motiai_app/
 │   ├── screens/
 │   │   └── quote_screen.dart      # Main quote display with glassmorphism UI
 │   ├── services/
-│   │   ├── hive_quote_service.dart # Quote management and AI integration
+│   │   ├── hive_quote_service.dart # Quote management and Hive integration
 │   │   ├── image_service.dart     # Stability AI image generation
-│   │   └── audio_service.dart     # Audio ambience management
+│   │   ├── audio_service.dart     # Audio ambience management
+│   │   └── ai_audio_service.dart  # AI audio generation with Claude
 │   └── main.dart                  # App entry point with Hive initialization
 ├── assets/
+│   ├── images/                    # Local background images
 │   └── audio/                     # Ambient audio files
+├── scripts/
+│   ├── migrate_standalone.dart    # Command-line migration tool
+│   ├── check_hive_data.dart       # Hive database inspector
+│   └── audit_hive_data.dart       # Comprehensive data audit
+├── bin/
+│   └── audit_hive_data.dart       # Standalone audit script
 ├── .env                           # Environment variables (git-ignored)
 └── pubspec.yaml                   # Dependencies
 ```
@@ -184,7 +202,7 @@ motiai_app/
 
 - **flutter_dotenv**: Environment variable management
 - **http**: API calls to Anthropic Claude and Stability AI
-- **hive_flutter**: Local storage for quotes and images
+- **hive_flutter**: Local storage for quotes, images, and audio
 - **audioplayers**: Audio playback for ambient sounds
 - **flutter/services**: Clipboard functionality
 
@@ -202,11 +220,11 @@ The app is designed to work beautifully even without API keys. You'll see:
 - Beautiful dynamic gradient backgrounds
 - All quote functionality with curated local quotes
 - Favorite quote storage
-- Audio ambience
+- Local audio ambience
 
 ### API Key Issues
 
-#### Anthropic Claude (for quotes):
+#### Anthropic Claude (for quotes and audio):
 - **"Anthropic not configured"**: Add `ANTHROPIC_API_KEY=your_key` to `.env`
 - **"Authentication failed"**: Check your API key at [console.anthropic.com](https://console.anthropic.com)
 - **"Rate limit exceeded"**: Wait a moment and try again
@@ -219,6 +237,35 @@ The app is designed to work beautifully even without API keys. You'll see:
 ### Audio Issues
 - **No audio playing**: Check that audio files are in the `assets/audio/` directory
 - **Audio not looping**: Audio automatically restarts every 30 seconds
+- **AI audio failing**: Falls back to local audio files automatically
+
+### Hive Database Issues
+- **Data not persisting**: Hive database is stored in app's sandboxed directory
+- **Corrupted data**: Use audit scripts to check database integrity
+- **Migration issues**: Use standalone migration scripts for data management
+
+## 🔍 Database Management
+
+### Audit Scripts
+The app includes several scripts for managing and auditing the Hive database:
+
+```bash
+# Check Hive data counts and structure
+dart scripts/check_hive_data.dart
+
+# Comprehensive database audit
+dart bin/audit_hive_data.dart
+
+# Simple data migration
+dart scripts/migrate_standalone.dart --status
+```
+
+### Data Storage
+- **Quotes**: Stored in Hive with local and AI-generated quotes
+- **Images**: AI-generated images cached as base64 in Hive
+- **Audio**: AI-generated audio cached as base64 in Hive
+- **Favorites**: User's favorite quotes stored in Hive
+- **Settings**: App configuration stored in Hive
 
 ## 🤝 Contributing
 
@@ -235,17 +282,59 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🙏 Acknowledgments
 
 - Stability AI for providing the image generation API
-- Anthropic for AI quote generation
+- Anthropic for AI quote and audio generation
 - The wisdom traditions for the inspirational quotes
 - Hive for efficient local storage
 - The Flutter community for excellent tooling and documentation
 
 ## 🎉 What's New
 
-- **Stability AI Integration**: High-quality AI-generated background images
-- **Glassmorphism UI**: Modern, transparent glass-like quote cards
-- **AI Image Caching**: Faster loading with local image storage
-- **Enhanced Audio**: Tradition-specific ambient sounds
-- **Authentic Authors**: AI quotes now use real author names
-- **Improved Animations**: Smooth transitions and effects
-- **Better Error Handling**: Graceful fallbacks for all features
+- **AI Audio Generation**: Unique ambient sounds generated with Anthropic Claude TTS
+- **Enhanced Hive Integration**: Comprehensive local storage for all app data
+- **Background Pre-generation**: AI images and audio pre-generated for all traditions
+- **Database Audit Tools**: Scripts for inspecting and managing Hive data
+- **Improved Fallback System**: Robust fallback to local assets when AI fails
+- **Clean UI**: Removed debug elements for a polished user experience
+
+## 🔧 Data Migration
+
+The app includes a command-line migration tool to copy local assets into Hive storage for better performance and data management.
+
+### Migration Tool Usage
+
+```bash
+# Check migration status
+dart scripts/migrate_standalone.dart --status
+
+# Prepare for full migration
+dart scripts/migrate_standalone.dart --migrate
+
+# Check only images
+dart scripts/migrate_standalone.dart --images
+
+# Check only audio files
+dart scripts/migrate_standalone.dart --audio
+
+# Show help
+dart scripts/migrate_standalone.dart --help
+```
+
+### What Gets Migrated
+
+- **Local Images**: Background images from `assets/images/` are converted to base64 and stored in Hive
+- **Audio Files**: Ambient audio from `assets/audio/` are converted to base64 and stored in Hive
+- **AI Images**: Already automatically stored in Hive when generated
+
+### Migration Benefits
+
+- **Faster Loading**: No need to read from asset files
+- **Better Performance**: Direct access from Hive database
+- **Consistent Storage**: All data (quotes, images, audio) in one place
+- **Offline Access**: All assets available even without internet
+
+### Migration Process
+
+1. **Check Status**: Run `dart scripts/migrate_standalone.dart --status` to see what assets are ready
+2. **Run App**: Start the Flutter app with `flutter run -d macos`
+3. **Perform Migration**: Use the MigrationService within the app to copy assets to Hive
+4. **Verify**: Check that all assets are now stored in Hive for faster access

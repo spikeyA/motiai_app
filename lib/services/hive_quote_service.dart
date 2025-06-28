@@ -10,11 +10,13 @@ class HiveQuoteService implements QuoteService {
   static const String _favoritesBoxName = 'favorites';
   static const String _settingsBoxName = 'settings';
   static const String _cachedImagesBoxName = 'cached_images';
+  static const String _cachedAudioBoxName = 'cached_audio';
   
   late Box<dynamic> _quotesBox;
   late Box<dynamic> _favoritesBox;
   late Box<dynamic> _settingsBox;
   late Box<dynamic> _cachedImagesBox;
+  late Box<dynamic> _cachedAudioBox;
   
   static HiveQuoteService? _instance;
   
@@ -33,6 +35,7 @@ class HiveQuoteService implements QuoteService {
     instance._favoritesBox = await Hive.openBox(_favoritesBoxName);
     instance._settingsBox = await Hive.openBox(_settingsBoxName);
     instance._cachedImagesBox = await Hive.openBox(_cachedImagesBoxName);
+    instance._cachedAudioBox = await Hive.openBox(_cachedAudioBoxName);
     
     // One-time migration to handle switch from Map to TypeAdapter
     if (instance._quotesBox.isNotEmpty && instance._quotesBox.getAt(0) is Map) {
@@ -484,6 +487,34 @@ class HiveQuoteService implements QuoteService {
       }
     }
     return quoteImages;
+  }
+  
+  /// Get the count of stored images
+  int getStoredImageCount() {
+    return _cachedImagesBox.length;
+  }
+  
+  /// Get a random quote from Hive/local only (no Anthropic)
+  Future<Quote> getRandomQuoteFromLocalOnly({String? category, String? tradition}) async {
+    List<Quote> allQuotes = await getAllQuotes();
+    if (allQuotes.isEmpty) {
+      throw Exception('No quotes found');
+    }
+    List<Quote> filteredQuotes = allQuotes;
+    if (tradition != null) {
+      final trimmedTradition = tradition.trim().toLowerCase();
+      filteredQuotes = filteredQuotes.where(
+        (q) => q.tradition.trim().toLowerCase() == trimmedTradition
+      ).toList();
+    }
+    if (category != null) {
+      filteredQuotes = filteredQuotes.where((q) => q.category.toLowerCase() == category.toLowerCase()).toList();
+    }
+    if (filteredQuotes.isEmpty) {
+      filteredQuotes = allQuotes;
+    }
+    filteredQuotes.shuffle();
+    return filteredQuotes.first;
   }
   
   Future<void> setSetting(String key, dynamic value) async {
@@ -940,6 +971,29 @@ class HiveQuoteService implements QuoteService {
     print('[HiveQuoteService] Loaded ${initialQuotes.length} initial quotes');
   }
   
+  // Audio storage methods
+  void storeGeneratedAudio(String audioId, String audioData) {
+    _cachedAudioBox.put(audioId, audioData);
+    print('[HiveQuoteService] Stored generated audio for: $audioId');
+  }
+  
+  String? getStoredAudio(String audioId) {
+    return _cachedAudioBox.get(audioId) as String?;
+  }
+  
+  int getStoredAudioCount() {
+    return _cachedAudioBox.length;
+  }
+  
+  List<String> getStoredAudioIds() {
+    return _cachedAudioBox.keys.cast<String>().toList();
+  }
+  
+  Future<void> clearAllAudio() async {
+    await _cachedAudioBox.clear();
+    print('[HiveQuoteService] Cleared all cached audio');
+  }
+  
   // Export/Import functionality
   Future<String> exportData() async {
     Map<String, dynamic> exportData = {
@@ -983,28 +1037,6 @@ class HiveQuoteService implements QuoteService {
     await _favoritesBox.close();
     await _settingsBox.close();
     await _cachedImagesBox.close();
-  }
-  
-  /// Get a random quote from Hive/local only (no Anthropic)
-  Future<Quote> getRandomQuoteFromLocalOnly({String? category, String? tradition}) async {
-    List<Quote> allQuotes = await getAllQuotes();
-    if (allQuotes.isEmpty) {
-      throw Exception('No quotes found');
-    }
-    List<Quote> filteredQuotes = allQuotes;
-    if (tradition != null) {
-      final trimmedTradition = tradition.trim().toLowerCase();
-      filteredQuotes = filteredQuotes.where(
-        (q) => q.tradition.trim().toLowerCase() == trimmedTradition
-      ).toList();
-    }
-    if (category != null) {
-      filteredQuotes = filteredQuotes.where((q) => q.category.toLowerCase() == category.toLowerCase()).toList();
-    }
-    if (filteredQuotes.isEmpty) {
-      filteredQuotes = allQuotes;
-    }
-    filteredQuotes.shuffle();
-    return filteredQuotes.first;
+    await _cachedAudioBox.close();
   }
 } 
