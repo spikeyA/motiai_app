@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../services/hive_quote_service.dart';
 import '../services/quote_service.dart';
@@ -102,20 +104,20 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   }
 
   Future<void> _initializeQuote() async {
-    // 1. Show a Hive/local quote immediately
-    final localQuote = await HiveQuoteService.instance.getRandomQuoteFromLocalOnly(
+    // 1. Show a Hive/local or AI quote immediately
+    final quote = await HiveQuoteService.instance.getRandomQuote(
       category: widget.category,
       tradition: widget.tradition,
     );
     setState(() {
-      _currentQuote = localQuote;
+      _currentQuote = quote;
     });
     // 2. In the background, start fetching the next AI quote
     _fetchNextAIQuote();
   }
 
   Future<void> _fetchNextAIQuote() async {
-    final aiQuote = await HiveQuoteService.fetchQuoteFromDeepAI();
+    final aiQuote = await HiveQuoteService.fetchQuoteFromAnthropic();
     if (mounted) {
       setState(() {
         _nextAIQuote = aiQuote;
@@ -136,14 +138,28 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
       await AudioService.playAmbience(quote.tradition);
     }
     
+    // Check if we have a stored image for this quote
+    final storedImage = HiveQuoteService.instance.getStoredImage(quote.id);
+    if (storedImage != null) {
+      print('[QuoteScreen] Using stored image for quote: ${quote.id}');
+      setState(() {
+        _backgroundImageUrl = storedImage;
+        _isLoadingImage = false;
+      });
+      return;
+    }
+    
     final prompt = buildPrompt("${quote.tradition} ${quote.category}");
     print('[QuoteScreen] Generating background for: ${quote.tradition} ${quote.category}');
-    final url = await DeepAIGenerator.generateImage(prompt);
+    final url = await StabilityAIGenerator.generateImage(prompt);
     print('[QuoteScreen] Received image URL: $url');
     setState(() {
       // Only set URL if it's a valid AI-generated image, not a fallback
       if (url != null && !url.contains('unsplash.com')) {
         _backgroundImageUrl = url;
+        // Store the generated image in Hive for this quote
+        HiveQuoteService.instance.storeGeneratedImage(quote.id, url);
+        print('[QuoteScreen] Stored generated image in Hive for quote: ${quote.id}');
       } else {
         _backgroundImageUrl = null; // Use gradient background
         print('[QuoteScreen] Using gradient background instead of fallback image');
@@ -175,14 +191,36 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
     }
   }
 
+  // Toggle AI quotes on/off
+  void _toggleAIQuotes() {
+    setState(() {
+      HiveQuoteService.useAIQuotes = !HiveQuoteService.useAIQuotes;
+    });
+    
+    // Show feedback to user
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          HiveQuoteService.useAIQuotes 
+            ? 'AI quotes enabled - will try AI first, then local' 
+            : 'AI quotes disabled - using local quotes only',
+        ),
+        duration: const Duration(seconds: 2),
+        backgroundColor: HiveQuoteService.useAIQuotes ? Colors.green : Colors.orange,
+      ),
+    );
+  }
+
   void _generateNewQuote() async {
+    print('[QuoteScreen] useAIQuotes: ${HiveQuoteService.useAIQuotes}');
     _fadeController.reverse().then((_) async {
       Quote? quoteToShow;
       if (_nextAIQuote != null) {
         quoteToShow = _nextAIQuote;
         _nextAIQuote = null; // Consume the AI quote
       } else {
-        quoteToShow = await HiveQuoteService.instance.getRandomQuoteFromLocalOnly(
+        // Try AI first, fallback to local
+        quoteToShow = await HiveQuoteService.instance.getRandomQuote(
           category: widget.category,
           tradition: _selectedTradition ?? widget.tradition,
         );
@@ -208,7 +246,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
       _gradientIndex = (_gradientIndex + 1) % _gradients.length;
     });
     final prompt = buildPrompt("${quote.tradition} ${quote.category}");
-    final url = await DeepAIGenerator.generateImage(prompt);
+    final url = await StabilityAIGenerator.generateImage(prompt);
     setState(() {
       // Only set URL if it's a valid AI-generated image, not a fallback
       if (url != null && !url.contains('unsplash.com')) {
@@ -218,45 +256,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
         print('[QuoteScreen] Using gradient background for refresh');
       }
       _isLoadingImage = false;
-    });
-  }
-
-  void _generateQuoteByTradition(String tradition) async {
-    _selectedTradition = tradition;
-    _fadeController.reverse().then((_) async {
-      // Get all quotes for the chosen tradition
-      final allQuotes = (await HiveQuoteService.instance.getAllQuotes())
-        .where((q) => q.tradition.trim().toLowerCase() == tradition.trim().toLowerCase())
-        .toList();
-      if (allQuotes.isEmpty) {
-        // Should not happen, but fallback to random quote from any tradition
-        final fallback = await HiveQuoteService.instance.getRandomQuoteFromLocalOnly();
-        setState(() {
-          _currentQuote = fallback;
-        });
-      } else {
-        // Track shown quotes for this tradition
-        _shownQuotesByTradition[tradition] ??= [];
-        // Filter out already shown quotes
-        final unseen = allQuotes.where((q) => !_shownQuotesByTradition[tradition]!.contains(q.id)).toList();
-        Quote nextQuote;
-        if (unseen.isNotEmpty) {
-          unseen.shuffle();
-          nextQuote = unseen.first;
-        } else {
-          // All quotes shown, reset
-          _shownQuotesByTradition[tradition] = [];
-          allQuotes.shuffle();
-          nextQuote = allQuotes.first;
-        }
-        _shownQuotesByTradition[tradition]!.add(nextQuote.id);
-        setState(() {
-          _currentQuote = nextQuote;
-        });
-      }
-      _generateBackgroundImage(_currentQuote!);
-      _fadeController.forward();
-      _scaleController.forward();
     });
   }
 
@@ -305,6 +304,38 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
     }
   }
 
+  // Helper widget to display both network and base64 images
+  Widget _buildImageWidget(String imageUrl) {
+    if (imageUrl.startsWith('data:image/')) {
+      // Handle base64 data URL
+      try {
+        final data = imageUrl.split(',')[1];
+        final bytes = base64Decode(data);
+        return Image.memory(
+          bytes,
+          key: ValueKey(imageUrl),
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          alignment: Alignment.center,
+        );
+      } catch (e) {
+        print('[Image] Error decoding base64: $e');
+        return const SizedBox.shrink();
+      }
+    } else {
+      // Handle network URL
+      return Image.network(
+        imageUrl,
+        key: ValueKey(imageUrl),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        alignment: Alignment.center,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_currentQuote == null) {
@@ -315,14 +346,16 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
       );
     }
     // Log the source for debugging, but do not show in UI
-    final isAIQuote = _currentQuote!.id.startsWith('ai_');
-    print('[QuoteScreen] Source: ${isAIQuote ? 'AI' : 'Local'}');
+    final actualSource = HiveQuoteService.useAIQuotes ? 'AI' : 'Local';
+    print('[QuoteScreen] Source: $actualSource');
     return Scaffold(
       body: Stack(
         children: [
-          // Beautiful gradient background (primary)
+          // Always show gradient as the bottom layer
           Positioned.fill(
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 900),
+              curve: Curves.easeInOut,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -332,45 +365,15 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
               ),
             ),
           ),
-          // AI-generated background image (only if available and valid)
-          if (_backgroundImageUrl != null && _backgroundImageUrl!.isNotEmpty)
-            Positioned.fill(
-              child: Image.network(
-                _backgroundImageUrl!,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: _gradients[_gradientIndex],
-                      ),
-                    ),
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  print('[Image] Failed to load: $_backgroundImageUrl');
-                  print('[Image] Error: $error');
-                  // Return the gradient background instead of gray
-                  return Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: _gradients[_gradientIndex],
-                      ),
-                    ),
-                  );
-                },
-              ),
+          // Image layer: always fills, fades in/out, no hover issues
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 900),
+              child: (_backgroundImageUrl != null && _backgroundImageUrl!.isNotEmpty)
+                  ? _buildImageWidget(_backgroundImageUrl!)
+                  : const SizedBox.shrink(),
             ),
+          ),
           // Loading spinner overlay
           if (_isLoadingImage)
             Positioned.fill(
@@ -383,12 +386,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                 ),
               ),
             ),
-          // Dark overlay for readability
-          Positioned.fill(
-            child: Container(
-              color: Colors.black.withOpacity(0.15),
-            ),
-          ),
           // Main content
           SafeArea(
             child: ListView(
@@ -417,126 +414,132 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                   ),
                   textAlign: TextAlign.center,
                 ),
+                const SizedBox(height: 8),
+                // AI Status Indicator
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.green.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.psychology,
+                        color: Colors.green.shade400,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'AI Enabled',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green.shade400,
+                          fontWeight: FontWeight.w500,
+                          shadows: _textShadows,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 40),
                 
                 // Quote Card
-                AnimatedBuilder(
-                  animation: Listenable.merge([_fadeAnimation, _scaleAnimation]),
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _scaleAnimation.value,
-                      child: Opacity(
-                        opacity: _fadeAnimation.value,
-                        child: Container(
-                          constraints: const BoxConstraints(maxWidth: 480),
-                          margin: const EdgeInsets.symmetric(horizontal: 20),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(32),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                              child: Container(
-                                padding: const EdgeInsets.all(24),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.01),
-                                  borderRadius: BorderRadius.circular(32),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.10),
-                                      blurRadius: 24,
-                                      offset: const Offset(0, 10),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 700),
+                  switchInCurve: Curves.easeInOut,
+                  switchOutCurve: Curves.easeInOut,
+                  child: _currentQuote == null
+                      ? const SizedBox.shrink()
+                      : Transform.scale(
+                          scale: _scaleAnimation.value,
+                          child: Opacity(
+                            opacity: _fadeAnimation.value,
+                            child: Container(
+                              key: ValueKey(_currentQuote!.id),
+                              constraints: const BoxConstraints(maxWidth: 480),
+                              margin: const EdgeInsets.symmetric(horizontal: 20),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(32),
+                                child: BackdropFilter(
+                                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(24),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(32),
                                     ),
-                                  ],
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // Tradition Badge
-                                    GestureDetector(
-                                      onTap: () => _generateQuoteByTradition(_currentQuote!.tradition),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 8,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        // Quote Text
+                                        Text(
+                                          _currentQuote!.text,
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w300,
+                                            height: 1.4,
+                                            color: _textColor,
+                                            shadows: _textShadows,
+                                          ),
+                                          textAlign: TextAlign.center,
                                         ),
-                                        decoration: BoxDecoration(
-                                          color: _getTraditionColor(_currentQuote!.tradition),
-                                          borderRadius: BorderRadius.circular(20),
+                                        const SizedBox(height: 24),
+                                        
+                                        // Author
+                                        Text(
+                                          _currentQuote!.author,
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w500,
+                                            color: _textColor.withOpacity(0.85),
+                                            fontStyle: FontStyle.italic,
+                                            shadows: _textShadows,
+                                          ),
                                         ),
-                                        child: Text(
+                                        const SizedBox(height: 16),
+                                        
+                                        // Tradition
+                                        Text(
                                           _currentQuote!.tradition,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
+                                          style: TextStyle(
                                             fontSize: 14,
+                                            color: _textColor.withOpacity(0.7),
+                                            fontWeight: FontWeight.w400,
+                                            shadows: _textShadows,
                                           ),
                                         ),
-                                      ),
+                                        const SizedBox(height: 20),
+                                        
+                                        // Heart Button for Favorites
+                                        ValueListenableBuilder(
+                                          valueListenable: Hive.box('favorites').listenable(),
+                                          builder: (context, box, child) {
+                                            final isFavorited = box.get(_currentQuote!.id) ?? false;
+                                            return IconButton(
+                                              icon: Icon(
+                                                isFavorited ? Icons.favorite : Icons.favorite_border,
+                                                color: isFavorited ? Colors.red.shade400 : _textColor.withOpacity(0.8),
+                                                size: 28,
+                                              ),
+                                              onPressed: () => _toggleFavorite(_currentQuote!),
+                                            );
+                                          },
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 24),
-                                    
-                                    // Quote Text
-                                    Text(
-                                      '"${_currentQuote!.text}"',
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w300,
-                                        height: 1.4,
-                                        color: _textColor,
-                                        shadows: _textShadows,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: 24),
-                                    
-                                    // Author
-                                    Text(
-                                      '- ${_currentQuote!.author}',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w500,
-                                        color: _textColor.withOpacity(0.85),
-                                        fontStyle: FontStyle.italic,
-                                        shadows: _textShadows,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    
-                                    // Category
-                                    Text(
-                                      _currentQuote!.category,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: _textColor.withOpacity(0.7),
-                                        fontWeight: FontWeight.w400,
-                                        shadows: _textShadows,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 20),
-                                    
-                                    // Heart Button for Favorites
-                                    ValueListenableBuilder(
-                                      valueListenable: Hive.box('favorites').listenable(),
-                                      builder: (context, box, child) {
-                                        final isFavorited = box.get(_currentQuote!.id) ?? false;
-                                        return IconButton(
-                                          icon: Icon(
-                                            isFavorited ? Icons.favorite : Icons.favorite_border,
-                                            color: isFavorited ? Colors.red.shade400 : _textColor.withOpacity(0.8),
-                                            size: 28,
-                                          ),
-                                          onPressed: () => _toggleFavorite(_currentQuote!),
-                                        );
-                                      },
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  },
                 ),
                 
                 const SizedBox(height: 24),
@@ -585,141 +588,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showTraditionDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.2),
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 24,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Title
-                      Text(
-                        'Choose Tradition',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
-                          shadows: _textShadows,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      // Traditions List
-                      ...QuoteServiceHelper.getTraditions().map((tradition) {
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: GestureDetector(
-                            onTap: () {
-                              Navigator.pop(context);
-                              _generateQuoteByTradition(tradition);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.1),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: _getTraditionColor(tradition),
-                                    radius: 20,
-                                    child: Text(
-                                      tradition[0],
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Text(
-                                      tradition,
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                        color: _textColor,
-                                        shadows: _textShadows,
-                                      ),
-                                    ),
-                                  ),
-                                  Icon(
-                                    Icons.arrow_forward_ios,
-                                    color: _textColor.withOpacity(0.6),
-                                    size: 16,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                      const SizedBox(height: 20),
-                      // Cancel Button
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                        ),
-                        child: Text(
-                          'Cancel',
-                          style: TextStyle(
-                            color: _textColor.withOpacity(0.8),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            shadows: _textShadows,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

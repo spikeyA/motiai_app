@@ -8,6 +8,7 @@ A beautiful Flutter macOS app that generates motivational quotes from Buddhist, 
 - **Dynamic Gradient Backgrounds**: 8 beautiful, vibrant gradient combinations that change dynamically
 - **Background Refresh**: Tap the refresh button to cycle through different gradient backgrounds
 - **Audio Ambience**: Tradition-specific ambient sounds that play automatically with each quote
+- **AI-Generated Quotes**: Unique, AI-generated quotes using Anthropic Claude API (when API key available)
 - **AI-Generated Backgrounds**: Unique, AI-generated background images using DeepAI (when API credits available)
 - **Favorite Quotes**: Heart button to save and manage your favorite quotes with persistent local storage
 - **Tradition Filtering**: Filter quotes by spiritual tradition
@@ -84,7 +85,8 @@ The app features 8 carefully crafted gradient combinations:
 - Flutter 3.32.4 or higher
 - Dart 3.8.1 or higher
 - macOS 10.15 or higher
-- DeepAI API key (optional - app works beautifully with gradients alone)
+- Anthropic API key (optional - for AI-generated quotes)
+- DeepAI API key (optional - for AI-generated backgrounds)
 
 ## 🚀 Setup Instructions
 
@@ -101,12 +103,13 @@ flutter pub get
 
 ### 3. Configure Environment Variables (Optional)
 
-The app works perfectly with beautiful gradient backgrounds even without API keys. If you want AI-generated images:
+The app works perfectly with beautiful gradient backgrounds even without API keys. If you want AI-generated quotes and images:
 
 #### Option A: Using .env file (Recommended)
 1. Create a `.env` file in the `motiai_app` directory:
 ```bash
-echo "DEEPAI_API_KEY=your_deepai_api_key_here" > .env
+echo "ANTHROPIC_API_KEY=your_anthropic_api_key_here" > .env
+echo "DEEPAI_API_KEY=your_deepai_api_key_here" >> .env
 ```
 
 2. Copy the `.env` file to the app's sandbox directory:
@@ -120,7 +123,15 @@ If the above doesn't work, manually copy your `.env` file to:
 ~/Library/Containers/com.example.motiaiApp/Data/.env
 ```
 
-### 4. Get Your DeepAI API Key (Optional)
+### 4. Get Your API Keys (Optional)
+
+#### For AI-Generated Quotes (Anthropic Claude):
+1. Sign up for an account at [console.anthropic.com](https://console.anthropic.com)
+2. Navigate to API Keys section
+3. Create a new API key
+4. Replace `your_anthropic_api_key_here` in the `.env` file with your actual key
+
+#### For AI-Generated Backgrounds (DeepAI):
 1. Sign up for a free account at [DeepAI.org](https://deepai.org)
 2. Navigate to your API key section
 3. Copy your API key
@@ -154,18 +165,20 @@ motiai_app/
 │   │   └── quote_screen.dart      # Main quote display screen with gradients
 │   ├── services/
 │   │   ├── quote_service.dart     # Quote data and filtering
+│   │   ├── hive_quote_service.dart # Anthropic Claude API integration
 │   │   └── image_service.dart     # DeepAI image generation with fallbacks
 │   └── main.dart                  # App entry point with Hive initialization
 ├── assets/
 │   └── images/                    # Static images (if any)
 ├── .env                           # Environment variables (git-ignored)
+├── ANTHROPIC_SETUP.md             # Anthropic Claude API setup guide
 └── pubspec.yaml                   # Dependencies including Hive for storage
 ```
 
 ## 🔧 Dependencies
 
 - **flutter_dotenv**: Environment variable management
-- **http**: API calls to DeepAI
+- **http**: API calls to Anthropic Claude and DeepAI
 - **hive_flutter**: Local storage for favorite quotes
 - **flutter/services**: Clipboard functionality
 
@@ -178,10 +191,10 @@ motiai_app/
 
 ## 🐛 Troubleshooting
 
-### App Works Without API Key
-The app is designed to work beautifully even without DeepAI API keys. You'll see:
+### App Works Without API Keys
+The app is designed to work beautifully even without API keys. You'll see:
 - Beautiful dynamic gradient backgrounds
-- All quote functionality
+- All quote functionality with curated local quotes
 - Favorite quote storage
 - Background refresh with different gradients
 
@@ -195,17 +208,20 @@ If you see a `FileNotFoundError` when loading the `.env` file:
    ```
 3. Restart the app
 
+### API Key Issues
+
+#### Anthropic Claude (for quotes):
+- **"Anthropic not configured"**: Add `ANTHROPIC_API_KEY=your_key` to `.env`
+- **"Authentication failed"**: Check your API key at [console.anthropic.com](https://console.anthropic.com)
+- **"Rate limit exceeded"**: Wait a moment and try again
+
+#### DeepAI (for backgrounds):
+- **"DeepAI not configured"**: Add `DEEPAI_API_KEY=your_key` to `.env`
+- **"Out of API credits"**: Add payment info to your DeepAI dashboard
+
 ### Permission Errors
 If you see "Operation not permitted" errors:
 - This is normal for sandboxed macOS apps
-- Ensure the `.env` file is in the app's sandbox directory
-- The app cannot access files outside its sandbox for security reasons
-
-### Build Issues
-If you encounter build issues:
-- Ensure you're running from the `motiai_app` directory (not the parent `motiAi` directory)
-- Run `flutter clean` and `flutter pub get` if needed
-- Check that macOS deployment target is set to 10.15 or higher
 
 ## 🤝 Contributing
 

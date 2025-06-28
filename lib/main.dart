@@ -8,6 +8,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'screens/quote_screen.dart';
 import 'services/hive_quote_service.dart';
+import 'services/image_service.dart';
 import 'models/quote.dart';
 
 void main() async {
@@ -16,7 +17,16 @@ void main() async {
   // Load environment variables FIRST
   try {
     await dotenv.load();
-    print('Loading .env: ${dotenv.env.isNotEmpty ? 'loaded' : 'not found'}');
+    print('Loading .env from: ${dotenv.env['ANTHROPIC_API_KEY'] != null ? 'success' : 'failed'}');
+    if (dotenv.env['ANTHROPIC_API_KEY'] != null) {
+      print('Anthropic API key found: ${dotenv.env['ANTHROPIC_API_KEY']!.substring(0, 8)}...');
+    }
+    if (dotenv.env['DEEPAI_API_KEY'] != null) {
+      print('DeepAI API key found: ${dotenv.env['DEEPAI_API_KEY']!.substring(0, 8)}...');
+    }
+    if (dotenv.env['STABILITY_API_KEY'] != null) {
+      print('Stability AI API key found: ${dotenv.env['STABILITY_API_KEY']!.substring(0, 8)}...');
+    }
   } catch (e) {
     print('No .env file found, continuing without environment variables');
   }
@@ -27,6 +37,14 @@ void main() async {
   
   // Initialize HiveQuoteService
   await HiveQuoteService.initialize();
+  
+  // Start pre-fetching images in the background (non-blocking)
+  if (dotenv.env['STABILITY_API_KEY'] != null) {
+    print('Starting background image pre-fetch...');
+    StabilityAIGenerator.preFetchImages().catchError((e) {
+      print('Background pre-fetch failed: $e');
+    });
+  }
   
   // Request audio permissions only on mobile platforms
   if (Platform.isAndroid || Platform.isIOS) {
