@@ -112,7 +112,13 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
     setState(() {
       _currentQuote = quote;
     });
-    // 2. In the background, start fetching the next AI quote
+    
+    // 2. Generate background image for the initial quote
+    if (quote != null) {
+      _generateBackgroundImage(quote);
+    }
+    
+    // 3. In the background, start fetching the next AI quote
     _fetchNextAIQuote();
   }
 
@@ -138,6 +144,11 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
       await AudioService.playAmbience(quote.tradition);
     }
     
+    // Clear cached Social Justice images to force regeneration with new prompt
+    if (quote.tradition.toLowerCase().contains('social')) {
+      await StabilityAIGenerator.clearCachedImagesForTheme("Social Justice");
+    }
+    
     // Check if we have a stored image for this quote
     final storedImage = HiveQuoteService.instance.getStoredImage(quote.id);
     if (storedImage != null) {
@@ -151,13 +162,15 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
     
     final prompt = buildPrompt("${quote.tradition} ${quote.category}");
     print('[QuoteScreen] Generating background for: ${quote.tradition} ${quote.category}');
+    print('[QuoteScreen] Using prompt: $prompt');
     final url = await StabilityAIGenerator.generateImage(prompt);
-    print('[QuoteScreen] Received image URL: $url');
+    print('[QuoteScreen] Received image URL: ${url?.substring(0, url.length > 50 ? 50 : url.length)}...');
+    
     setState(() {
       // Only set URL if it's a valid AI-generated image, not a fallback
       if (url != null && !url.contains('unsplash.com')) {
         _backgroundImageUrl = url;
-        // Store the generated image in Hive for this quote
+        // Always store AI-generated images in Hive, regardless of quote source
         HiveQuoteService.instance.storeGeneratedImage(quote.id, url);
         print('[QuoteScreen] Stored generated image in Hive for quote: ${quote.id}');
       } else {
@@ -236,26 +249,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
       _scaleController.forward();
       // Start fetching the next AI quote in the background
       _fetchNextAIQuote();
-    });
-  }
-
-  void _generateNewBackground(Quote quote) async {
-    setState(() {
-      _isLoadingImage = true;
-      // Cycle to next gradient
-      _gradientIndex = (_gradientIndex + 1) % _gradients.length;
-    });
-    final prompt = buildPrompt("${quote.tradition} ${quote.category}");
-    final url = await StabilityAIGenerator.generateImage(prompt);
-    setState(() {
-      // Only set URL if it's a valid AI-generated image, not a fallback
-      if (url != null && !url.contains('unsplash.com')) {
-        _backgroundImageUrl = url;
-      } else {
-        _backgroundImageUrl = null; // Use gradient background
-        print('[QuoteScreen] Using gradient background for refresh');
-      }
-      _isLoadingImage = false;
     });
   }
 
@@ -465,19 +458,55 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                               key: ValueKey(_currentQuote!.id),
                               constraints: const BoxConstraints(maxWidth: 480),
                               margin: const EdgeInsets.symmetric(horizontal: 20),
-                              child: ClipRRect(
+                              decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(32),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.1),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.white.withOpacity(0.05),
+                                    blurRadius: 15,
+                                    spreadRadius: 0,
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(30),
                                 child: BackdropFilter(
-                                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                                  filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
                                   child: Container(
                                     padding: const EdgeInsets.all(24),
                                     decoration: BoxDecoration(
-                                      color: Colors.transparent,
-                                      borderRadius: BorderRadius.circular(32),
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Colors.white.withOpacity(0.06),
+                                          Colors.white.withOpacity(0.02),
+                                          Colors.white.withOpacity(0.04),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(30),
                                       border: Border.all(
-                                        color: Colors.white.withOpacity(0.2),
+                                        color: Colors.white.withOpacity(0.08),
                                         width: 1,
                                       ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.08),
+                                          blurRadius: 20,
+                                          spreadRadius: 0,
+                                          offset: const Offset(0, 10),
+                                        ),
+                                        BoxShadow(
+                                          color: Colors.white.withOpacity(0.03),
+                                          blurRadius: 10,
+                                          spreadRadius: 0,
+                                          offset: const Offset(0, -5),
+                                        ),
+                                      ],
                                     ),
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
@@ -489,22 +518,22 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                             fontSize: 24,
                                             fontWeight: FontWeight.w300,
                                             height: 1.5,
-                                            color: Colors.black87,
+                                            color: Colors.white,
                                             letterSpacing: 0.5,
                                             shadows: [
                                               Shadow(
-                                                blurRadius: 16,
-                                                color: Colors.white,
+                                                blurRadius: 20,
+                                                color: Colors.black87,
                                                 offset: const Offset(0, 4),
                                               ),
                                               Shadow(
-                                                blurRadius: 12,
-                                                color: Colors.white70,
+                                                blurRadius: 16,
+                                                color: Colors.black54,
                                                 offset: const Offset(0, 2),
                                               ),
                                               Shadow(
-                                                blurRadius: 8,
-                                                color: Colors.white54,
+                                                blurRadius: 12,
+                                                color: Colors.black38,
                                                 offset: const Offset(0, 1),
                                               ),
                                             ],
@@ -519,23 +548,23 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                           style: TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.w400,
-                                            color: Colors.black87,
+                                            color: Colors.white,
                                             fontStyle: FontStyle.italic,
                                             letterSpacing: 1.0,
                                             shadows: [
                                               Shadow(
-                                                blurRadius: 12,
-                                                color: Colors.white,
+                                                blurRadius: 16,
+                                                color: Colors.black87,
                                                 offset: const Offset(0, 3),
                                               ),
                                               Shadow(
-                                                blurRadius: 8,
-                                                color: Colors.white70,
+                                                blurRadius: 12,
+                                                color: Colors.black54,
                                                 offset: const Offset(0, 2),
                                               ),
                                               Shadow(
-                                                blurRadius: 4,
-                                                color: Colors.white54,
+                                                blurRadius: 8,
+                                                color: Colors.black38,
                                                 offset: const Offset(0, 1),
                                               ),
                                             ],
@@ -548,23 +577,23 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                           _currentQuote!.tradition,
                                           style: TextStyle(
                                             fontSize: 14,
-                                            color: Colors.black87,
+                                            color: Colors.white,
                                             fontWeight: FontWeight.w300,
                                             letterSpacing: 0.8,
                                             shadows: [
                                               Shadow(
-                                                blurRadius: 10,
-                                                color: Colors.white,
+                                                blurRadius: 14,
+                                                color: Colors.black87,
                                                 offset: const Offset(0, 2),
                                               ),
                                               Shadow(
-                                                blurRadius: 6,
-                                                color: Colors.white70,
+                                                blurRadius: 10,
+                                                color: Colors.black54,
                                                 offset: const Offset(0, 1),
                                               ),
                                               Shadow(
-                                                blurRadius: 3,
-                                                color: Colors.white54,
+                                                blurRadius: 6,
+                                                color: Colors.black38,
                                                 offset: const Offset(0, 0.5),
                                               ),
                                             ],
@@ -580,7 +609,7 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                                             return IconButton(
                                               icon: Icon(
                                                 isFavorited ? Icons.favorite : Icons.favorite_border,
-                                                color: isFavorited ? Colors.red.shade400 : Colors.black87,
+                                                color: isFavorited ? Colors.red.shade400 : Colors.white,
                                                 size: 28,
                                               ),
                                               onPressed: () => _toggleFavorite(_currentQuote!),
@@ -618,13 +647,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                         _isAudioEnabled ? Icons.volume_up : Icons.volume_off,
                         color: Colors.white,
                       ),
-                    ),
-                    
-                    // Background Refresh Button
-                    FloatingActionButton.small(
-                      onPressed: () => _generateNewBackground(_currentQuote!),
-                      backgroundColor: Colors.orange.shade400,
-                      child: const Icon(Icons.refresh, color: Colors.white),
                     ),
                     
                     // Generate New Quote Button
