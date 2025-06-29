@@ -22,6 +22,9 @@ class Quote {
   @HiveField(5)
   final String imageUrl;
 
+  @HiveField(6)
+  final String? affirmation;
+
   Quote({
     required this.id,
     required this.text,
@@ -29,6 +32,7 @@ class Quote {
     required this.tradition,
     required this.category,
     this.imageUrl = '',
+    this.affirmation,
   });
 
   // Convert to Map for Hive storage
@@ -40,6 +44,7 @@ class Quote {
       'tradition': tradition,
       'category': category,
       'imageUrl': imageUrl,
+      'affirmation': affirmation,
     };
   }
 
@@ -52,12 +57,26 @@ class Quote {
       tradition: map['tradition'] ?? '',
       category: map['category'] ?? '',
       imageUrl: map['imageUrl'] ?? '',
+      affirmation: map['affirmation'],
+    );
+  }
+
+  // Create a copy with updated affirmation
+  Quote copyWith({String? affirmation}) {
+    return Quote(
+      id: id,
+      text: text,
+      author: author,
+      tradition: tradition,
+      category: category,
+      imageUrl: imageUrl,
+      affirmation: affirmation ?? this.affirmation,
     );
   }
 
   @override
   String toString() {
-    return 'Quote(id: $id, text: $text, author: $author, tradition: $tradition, category: $category)';
+    return 'Quote(id: $id, text: $text, author: $author, tradition: $tradition, category: $category, affirmation: $affirmation)';
   }
 
   @override
