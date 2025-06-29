@@ -11,6 +11,7 @@ import 'services/hive_quote_service.dart';
 import 'services/image_service.dart';
 import 'models/quote.dart';
 import 'services/ai_audio_service.dart';
+import 'services/affirmation_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +39,9 @@ void main() async {
   
   // Initialize HiveQuoteService
   await HiveQuoteService.initialize();
+  
+  // Initialize AffirmationService
+  await AffirmationService.initialize();
   
   // Start pre-fetching images in the background (non-blocking)
   if (dotenv.env['STABILITY_API_KEY'] != null) {

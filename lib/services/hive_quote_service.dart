@@ -994,6 +994,33 @@ class HiveQuoteService implements QuoteService {
     print('[HiveQuoteService] Cleared all cached audio');
   }
   
+  // Affirmation storage methods
+  Future<void> saveAffirmationToQuote(String quoteId, String affirmation) async {
+    final quote = _quotesBox.get(quoteId) as Quote?;
+    if (quote != null) {
+      final updatedQuote = Quote(
+        id: quote.id,
+        text: quote.text,
+        author: quote.author,
+        tradition: quote.tradition,
+        category: quote.category,
+        imageUrl: quote.imageUrl,
+        affirmation: affirmation,
+      );
+      await _quotesBox.put(quoteId, updatedQuote);
+      print('[HiveQuoteService] Saved affirmation to quote: $quoteId');
+    }
+  }
+  
+  String? getAffirmationForQuote(String quoteId) {
+    final quote = _quotesBox.get(quoteId) as Quote?;
+    return quote?.affirmation;
+  }
+  
+  Quote? getQuote(String quoteId) {
+    return _quotesBox.get(quoteId) as Quote?;
+  }
+  
   // Export/Import functionality
   Future<String> exportData() async {
     Map<String, dynamic> exportData = {
@@ -1038,5 +1065,9 @@ class HiveQuoteService implements QuoteService {
     await _settingsBox.close();
     await _cachedImagesBox.close();
     await _cachedAudioBox.close();
+  }
+  
+  List<String> getQuoteIdsWithImages() {
+    return _cachedImagesBox.keys.cast<String>().toList();
   }
 } 

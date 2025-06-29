@@ -23,13 +23,14 @@ class QuoteAdapter extends TypeAdapter<Quote> {
       tradition: fields[3] as String,
       category: fields[4] as String,
       imageUrl: fields[5] as String,
+      affirmation: fields[6] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Quote obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -41,7 +42,9 @@ class QuoteAdapter extends TypeAdapter<Quote> {
       ..writeByte(4)
       ..write(obj.category)
       ..writeByte(5)
-      ..write(obj.imageUrl);
+      ..write(obj.imageUrl)
+      ..writeByte(6)
+      ..write(obj.affirmation);
   }
 
   @override

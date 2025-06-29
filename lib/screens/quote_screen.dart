@@ -9,7 +9,9 @@ import '../services/hive_quote_service.dart';
 import '../services/quote_service.dart';
 import '../services/image_service.dart';
 import '../services/audio_service.dart';
+import '../services/affirmation_service.dart';
 import '../models/quote.dart';
+import 'notepad_screen.dart';
 
 class QuoteScreen extends StatefulWidget {
   final String? category;
@@ -107,14 +109,17 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   }
 
   Future<void> _initializeQuote() async {
+    print('[QuoteScreen] Initializing quote...');
     // 1. Show a Hive/local or AI quote immediately
     final quote = await HiveQuoteService.instance.getRandomQuote(
       category: widget.category,
       tradition: widget.tradition,
     );
+    print('[QuoteScreen] Got quote: ${quote?.text ?? 'null'}');
     setState(() {
       _currentQuote = quote;
     });
+    print('[QuoteScreen] Set current quote: ${_currentQuote?.text ?? 'null'}');
     
     // 2. Generate background image for the initial quote
     if (quote != null) {
@@ -331,11 +336,164 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
     }
   }
 
+  // Generate affirmation from current quote
+  Future<void> _generateAffirmation() async {
+    if (_currentQuote == null) return;
+    
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Generating affirmation...'),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      final affirmation = await AffirmationService.generateAffirmation(
+        _currentQuote!,
+        _currentQuote!.tradition,
+      );
+      
+      // Close loading dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      
+      if (affirmation != null) {
+        // Show affirmation dialog with options
+        if (mounted) {
+          _showAffirmationDialog(affirmation);
+        }
+      } else {
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to generate affirmation. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating affirmation: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  // Show affirmation dialog with copy and save options
+  void _showAffirmationDialog(String affirmation) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('✨ Your Personal Affirmation'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              affirmation,
+              style: const TextStyle(
+                fontSize: 18,
+                fontStyle: FontStyle.italic,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Based on: "${_currentQuote!.text}"',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            Text(
+              '- ${_currentQuote!.author} [${_currentQuote!.tradition}]',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: affirmation));
+              if (mounted) {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Affirmation copied to clipboard!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text('Copy'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await AffirmationService.instance.saveAffirmation(affirmation, _currentQuote!);
+              if (mounted) {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Affirmation saved to notepad!'),
+                    backgroundColor: Colors.blue,
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.save),
+            label: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Navigate to notepad screen
+  void _openNotepad() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const NotepadScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Log the source for debugging, but do not show in UI
     final actualSource = HiveQuoteService.useAIQuotes ? 'AI' : 'Local';
     print('[QuoteScreen] Source: $actualSource');
+    print('[QuoteScreen] Current quote: ${_currentQuote?.text ?? 'null'}');
+    print('[QuoteScreen] Current quote ID: ${_currentQuote?.id ?? 'null'}');
     return Scaffold(
       body: Stack(
         children: [
@@ -432,181 +590,252 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                   switchInCurve: Curves.easeInOut,
                   switchOutCurve: Curves.easeInOut,
                   child: _currentQuote == null
-                      ? const SizedBox.shrink()
-                      : Transform.scale(
-                          scale: _scaleAnimation.value,
-                          child: Opacity(
-                            opacity: _fadeAnimation.value,
-                            child: Container(
-                              key: ValueKey(_currentQuote!.id),
-                              constraints: const BoxConstraints(maxWidth: 480),
-                              margin: const EdgeInsets.symmetric(horizontal: 20),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(32),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.1),
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.white.withOpacity(0.05),
-                                    blurRadius: 15,
-                                    spreadRadius: 0,
+                      ? (() {
+                          print('[QuoteScreen] Quote card: _currentQuote is null, showing SizedBox.shrink()');
+                          return const SizedBox.shrink();
+                        })()
+                      : (() {
+                          print('[QuoteScreen] Quote card: Rendering quote "${_currentQuote!.text}"');
+                          print('[QuoteScreen] Animation values - scale: ${_scaleAnimation.value}, opacity: ${_fadeAnimation.value}');
+                          return Transform.scale(
+                            scale: _scaleAnimation.value,
+                            child: Opacity(
+                              opacity: _fadeAnimation.value,
+                              child: Container(
+                                key: ValueKey(_currentQuote!.id),
+                                constraints: const BoxConstraints(maxWidth: 480),
+                                margin: const EdgeInsets.symmetric(horizontal: 20),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(32),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.03),
+                                    width: 1.0,
                                   ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(30),
-                                child: BackdropFilter(
-                                  filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(24),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Colors.white.withOpacity(0.06),
-                                          Colors.white.withOpacity(0.02),
-                                          Colors.white.withOpacity(0.04),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.white.withOpacity(0.01),
+                                      blurRadius: 8,
+                                      spreadRadius: 0,
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(30),
+                                  child: BackdropFilter(
+                                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(24),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            Colors.white.withOpacity(0.015),
+                                            Colors.white.withOpacity(0.005),
+                                            Colors.white.withOpacity(0.01),
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(30),
+                                        border: Border.all(
+                                          color: Colors.white.withOpacity(0.02),
+                                          width: 0.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.02),
+                                            blurRadius: 10,
+                                            spreadRadius: 0,
+                                            offset: const Offset(0, 6),
+                                          ),
+                                          BoxShadow(
+                                            color: Colors.white.withOpacity(0.01),
+                                            blurRadius: 6,
+                                            spreadRadius: 0,
+                                            offset: const Offset(0, -2),
+                                          ),
                                         ],
                                       ),
-                                      borderRadius: BorderRadius.circular(30),
-                                      border: Border.all(
-                                        color: Colors.white.withOpacity(0.08),
-                                        width: 1,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Quote Text
+                                          Text(
+                                            _currentQuote!.text,
+                                            style: TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.w300,
+                                              height: 1.5,
+                                              color: Colors.white,
+                                              letterSpacing: 0.5,
+                                              shadows: [
+                                                Shadow(
+                                                  blurRadius: 20,
+                                                  color: Colors.black87,
+                                                  offset: const Offset(0, 4),
+                                                ),
+                                                Shadow(
+                                                  blurRadius: 16,
+                                                  color: Colors.black54,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                                Shadow(
+                                                  blurRadius: 12,
+                                                  color: Colors.black38,
+                                                  offset: const Offset(0, 1),
+                                                ),
+                                              ],
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                          const SizedBox(height: 24),
+                                          
+                                          // Author
+                                          Text(
+                                            _currentQuote!.author,
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w400,
+                                              color: Colors.white,
+                                              fontStyle: FontStyle.italic,
+                                              letterSpacing: 1.0,
+                                              shadows: [
+                                                Shadow(
+                                                  blurRadius: 16,
+                                                  color: Colors.black87,
+                                                  offset: const Offset(0, 3),
+                                                ),
+                                                Shadow(
+                                                  blurRadius: 12,
+                                                  color: Colors.black54,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                                Shadow(
+                                                  blurRadius: 8,
+                                                  color: Colors.black38,
+                                                  offset: const Offset(0, 1),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          
+                                          // Tradition
+                                          Text(
+                                            _currentQuote!.tradition,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w300,
+                                              letterSpacing: 0.8,
+                                              shadows: [
+                                                Shadow(
+                                                  blurRadius: 14,
+                                                  color: Colors.black87,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                                Shadow(
+                                                  blurRadius: 10,
+                                                  color: Colors.black54,
+                                                  offset: const Offset(0, 1),
+                                                ),
+                                                Shadow(
+                                                  blurRadius: 6,
+                                                  color: Colors.black38,
+                                                  offset: const Offset(0, 0.5),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          
+                                          // Affirmation Display
+                                          if (_currentQuote!.affirmation != null && _currentQuote!.affirmation!.isNotEmpty) ...[
+                                            const SizedBox(height: 20),
+                                            Container(
+                                              padding: const EdgeInsets.all(16),
+                                              decoration: BoxDecoration(
+                                                color: Colors.purple.withOpacity(0.08),
+                                                borderRadius: BorderRadius.circular(16),
+                                                border: Border.all(
+                                                  color: Colors.purple.withOpacity(0.1),
+                                                  width: 0.5,
+                                                ),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.auto_awesome,
+                                                        color: Colors.purple.shade300,
+                                                        size: 16,
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Text(
+                                                        'Your Affirmation',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Colors.purple.shade300,
+                                                          fontWeight: FontWeight.w600,
+                                                          letterSpacing: 0.5,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Text(
+                                                    _currentQuote!.affirmation!,
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      color: Colors.white,
+                                                      fontWeight: FontWeight.w400,
+                                                      fontStyle: FontStyle.italic,
+                                                      height: 1.4,
+                                                      shadows: [
+                                                        Shadow(
+                                                          blurRadius: 12,
+                                                          color: Colors.black87,
+                                                          offset: const Offset(0, 2),
+                                                        ),
+                                                        Shadow(
+                                                          blurRadius: 8,
+                                                          color: Colors.black54,
+                                                          offset: const Offset(0, 1),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                          
+                                          const SizedBox(height: 20),
+                                          
+                                          // Heart Button for Favorites
+                                          ValueListenableBuilder(
+                                            valueListenable: Hive.box('favorites').listenable(),
+                                            builder: (context, box, child) {
+                                              final isFavorited = box.get(_currentQuote!.id) ?? false;
+                                              return IconButton(
+                                                icon: Icon(
+                                                  isFavorited ? Icons.favorite : Icons.favorite_border,
+                                                  color: isFavorited ? Colors.red.shade400 : Colors.white,
+                                                  size: 28,
+                                                ),
+                                                onPressed: () => _toggleFavorite(_currentQuote!),
+                                              );
+                                            },
+                                          ),
+                                        ],
                                       ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.08),
-                                          blurRadius: 20,
-                                          spreadRadius: 0,
-                                          offset: const Offset(0, 10),
-                                        ),
-                                        BoxShadow(
-                                          color: Colors.white.withOpacity(0.03),
-                                          blurRadius: 10,
-                                          spreadRadius: 0,
-                                          offset: const Offset(0, -5),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        // Quote Text
-                                        Text(
-                                          _currentQuote!.text,
-                                          style: TextStyle(
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.w300,
-                                            height: 1.5,
-                                            color: Colors.white,
-                                            letterSpacing: 0.5,
-                                            shadows: [
-                                              Shadow(
-                                                blurRadius: 20,
-                                                color: Colors.black87,
-                                                offset: const Offset(0, 4),
-                                              ),
-                                              Shadow(
-                                                blurRadius: 16,
-                                                color: Colors.black54,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                              Shadow(
-                                                blurRadius: 12,
-                                                color: Colors.black38,
-                                                offset: const Offset(0, 1),
-                                              ),
-                                            ],
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        const SizedBox(height: 24),
-                                        
-                                        // Author
-                                        Text(
-                                          _currentQuote!.author,
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w400,
-                                            color: Colors.white,
-                                            fontStyle: FontStyle.italic,
-                                            letterSpacing: 1.0,
-                                            shadows: [
-                                              Shadow(
-                                                blurRadius: 16,
-                                                color: Colors.black87,
-                                                offset: const Offset(0, 3),
-                                              ),
-                                              Shadow(
-                                                blurRadius: 12,
-                                                color: Colors.black54,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                              Shadow(
-                                                blurRadius: 8,
-                                                color: Colors.black38,
-                                                offset: const Offset(0, 1),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        
-                                        // Tradition
-                                        Text(
-                                          _currentQuote!.tradition,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w300,
-                                            letterSpacing: 0.8,
-                                            shadows: [
-                                              Shadow(
-                                                blurRadius: 14,
-                                                color: Colors.black87,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                              Shadow(
-                                                blurRadius: 10,
-                                                color: Colors.black54,
-                                                offset: const Offset(0, 1),
-                                              ),
-                                              Shadow(
-                                                blurRadius: 6,
-                                                color: Colors.black38,
-                                                offset: const Offset(0, 0.5),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 20),
-                                        
-                                        // Heart Button for Favorites
-                                        ValueListenableBuilder(
-                                          valueListenable: Hive.box('favorites').listenable(),
-                                          builder: (context, box, child) {
-                                            final isFavorited = box.get(_currentQuote!.id) ?? false;
-                                            return IconButton(
-                                              icon: Icon(
-                                                isFavorited ? Icons.favorite : Icons.favorite_border,
-                                                color: isFavorited ? Colors.red.shade400 : Colors.white,
-                                                size: 28,
-                                              ),
-                                              onPressed: () => _toggleFavorite(_currentQuote!),
-                                            );
-                                          },
-                                        ),
-                                      ],
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ),
+                          );
+                        })(),
                 ),
                 
                 const SizedBox(height: 24),
@@ -620,6 +849,20 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                       onPressed: _shareQuote,
                       backgroundColor: Colors.green.shade400,
                       child: const Icon(Icons.share, color: Colors.white),
+                    ),
+                    
+                    // Affirmation Button
+                    FloatingActionButton(
+                      onPressed: _generateAffirmation,
+                      backgroundColor: Colors.purple.shade400,
+                      child: const Icon(Icons.auto_awesome, color: Colors.white),
+                    ),
+                    
+                    // Notepad Button
+                    FloatingActionButton.small(
+                      onPressed: _openNotepad,
+                      backgroundColor: Colors.orange.shade400,
+                      child: const Icon(Icons.note, color: Colors.white),
                     ),
                     
                     // Audio Toggle Button
