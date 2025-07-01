@@ -10,6 +10,8 @@ class AudioService {
   static const int _audioIntervalSeconds = 30; // 30-second intervals
   static String? _currentAudioFilePath; // Track current audio file
   static String? _currentAudioId; // Track current AI audio ID
+  static String? _lastAudioTradition;
+  static final Map<String, Set<String>> _playedAudioKeys = {};
 
   // Audio files for each tradition
   static const Map<String, String> _ambienceSounds = {
@@ -40,24 +42,50 @@ class AudioService {
   /// Play ambience sound for a specific tradition
   static Future<void> playAmbience(String tradition) async {
     try {
+      // Prevent same tradition twice in a row (unless only one tradition)
+      if (_lastAudioTradition == tradition) {
+        print('[Audio] Skipping audio for same tradition in a row: $tradition');
+        return;
+      }
+      _lastAudioTradition = tradition;
+
       // Stop any currently playing audio
       await stopAmbience();
 
-      // First, try to get AI-generated audio from Hive
-      final aiAudioId = _generateAIAudioId(tradition);
-      final aiAudioData = HiveQuoteService.instance.getStoredAudio(aiAudioId);
-      
-      if (aiAudioData != null && aiAudioData.startsWith('data:audio/')) {
-        // Use AI-generated audio
-        print('[Audio] Using AI-generated audio for $tradition: $aiAudioId');
-        await _playAIAudio(aiAudioData, aiAudioId);
-      } else {
-        // Fall back to local audio files
-        String audioFile = _getAudioFile(tradition);
-        _currentAudioFilePath = audioFile;
-        print('[Audio] Using local audio for $tradition: $audioFile');
-        await _playLocalAudio(audioFile);
+      // Gather all available AI audio keys for this tradition
+      final allAudioKeys = HiveQuoteService.instance.getAIAudioKeysForTradition(tradition);
+
+      // Track played audio keys for this tradition in the session
+      _playedAudioKeys.putIfAbsent(tradition, () => <String>{});
+      final played = _playedAudioKeys[tradition]!;
+      final unplayed = allAudioKeys.where((k) => !played.contains(k)).toList();
+
+      String? selectedAudioId;
+      if (unplayed.isNotEmpty) {
+        unplayed.shuffle();
+        selectedAudioId = unplayed.first;
+      } else if (allAudioKeys.isNotEmpty) {
+        // All played, reset and pick randomly
+        played.clear();
+        allAudioKeys.shuffle();
+        selectedAudioId = allAudioKeys.first;
       }
+
+      if (selectedAudioId != null) {
+        final aiAudioData = HiveQuoteService.instance.getStoredAudio(selectedAudioId);
+        if (aiAudioData != null && aiAudioData.startsWith('data:audio/')) {
+          print('[Audio] Using AI-generated audio for $tradition: $selectedAudioId');
+          played.add(selectedAudioId);
+          await _playAIAudio(aiAudioData, selectedAudioId);
+          return;
+        }
+      }
+
+      // Fallback to local audio files
+      String audioFile = _getAudioFile(tradition);
+      _currentAudioFilePath = audioFile;
+      print('[Audio] Using local audio for $tradition: $audioFile');
+      await _playLocalAudio(audioFile);
     } catch (e) {
       print('[Audio] Error playing ambience: $e');
       // Don't throw error - audio is optional

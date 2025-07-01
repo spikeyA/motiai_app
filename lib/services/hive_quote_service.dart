@@ -981,20 +981,46 @@ class HiveQuoteService implements QuoteService {
     return _cachedAudioBox.get(audioId) as String?;
   }
   
-  int getStoredAudioCount() {
-    return _cachedAudioBox.length;
+  // Export/Import functionality
+  Future<String> exportData() async {
+    Map<String, dynamic> exportData = {
+      'quotes': _quotesBox.toMap(),
+      'favorites': _favoritesBox.toMap(),
+      'settings': _settingsBox.toMap(),
+      'cached_images': _cachedImagesBox.toMap(),
+    };
+    return jsonEncode(exportData);
   }
   
-  List<String> getStoredAudioIds() {
-    return _cachedAudioBox.keys.cast<String>().toList();
+  Future<void> importData(String jsonData) async {
+    Map<String, dynamic> importData = jsonDecode(jsonData);
+    await _quotesBox.clear();
+    await _favoritesBox.clear();
+    await _settingsBox.clear();
+    await _cachedImagesBox.clear();
+    for (var entry in importData['quotes'].entries) {
+      await _quotesBox.put(entry.key, entry.value);
+    }
+    for (var entry in importData['favorites'].entries) {
+      await _favoritesBox.put(entry.key, entry.value);
+    }
+    for (var entry in importData['settings'].entries) {
+      await _settingsBox.put(entry.key, entry.value);
+    }
+    for (var entry in importData['cached_images'].entries) {
+      await _cachedImagesBox.put(entry.key, entry.value);
+    }
   }
   
-  Future<void> clearAllAudio() async {
-    await _cachedAudioBox.clear();
-    print('[HiveQuoteService] Cleared all cached audio');
+  // Cleanup
+  Future<void> dispose() async {
+    await _quotesBox.close();
+    await _favoritesBox.close();
+    await _settingsBox.close();
+    await _cachedImagesBox.close();
+    await _cachedAudioBox.close();
   }
   
-  // Affirmation storage methods
   Future<void> saveAffirmationToQuote(String quoteId, String affirmation) async {
     final quote = _quotesBox.get(quoteId) as Quote?;
     if (quote != null) {
@@ -1012,62 +1038,16 @@ class HiveQuoteService implements QuoteService {
     }
   }
   
-  String? getAffirmationForQuote(String quoteId) {
-    final quote = _quotesBox.get(quoteId) as Quote?;
-    return quote?.affirmation;
-  }
-  
-  Quote? getQuote(String quoteId) {
-    return _quotesBox.get(quoteId) as Quote?;
-  }
-  
-  // Export/Import functionality
-  Future<String> exportData() async {
-    Map<String, dynamic> exportData = {
-      'quotes': _quotesBox.toMap(),
-      'favorites': _favoritesBox.toMap(),
-      'settings': _settingsBox.toMap(),
-      'cached_images': _cachedImagesBox.toMap(),
-    };
-    
-    return jsonEncode(exportData);
-  }
-  
-  Future<void> importData(String jsonData) async {
-    Map<String, dynamic> importData = jsonDecode(jsonData);
-    
-    await _quotesBox.clear();
-    await _favoritesBox.clear();
-    await _settingsBox.clear();
-    await _cachedImagesBox.clear();
-    
-    for (var entry in importData['quotes'].entries) {
-      await _quotesBox.put(entry.key, entry.value);
-    }
-    
-    for (var entry in importData['favorites'].entries) {
-      await _favoritesBox.put(entry.key, entry.value);
-    }
-    
-    for (var entry in importData['settings'].entries) {
-      await _settingsBox.put(entry.key, entry.value);
-    }
-    
-    for (var entry in importData['cached_images'].entries) {
-      await _cachedImagesBox.put(entry.key, entry.value);
-    }
-  }
-  
-  // Cleanup
-  Future<void> dispose() async {
-    await _quotesBox.close();
-    await _favoritesBox.close();
-    await _settingsBox.close();
-    await _cachedImagesBox.close();
-    await _cachedAudioBox.close();
-  }
-  
+  // Returns all image keys stored in the cached images box
   List<String> getQuoteIdsWithImages() {
     return _cachedImagesBox.keys.cast<String>().toList();
+  }
+  
+  List<String> getAIAudioKeysForTradition(String tradition) {
+    final pattern = 'ai_audio_${tradition.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
+    return _cachedAudioBox.keys
+        .where((k) => k is String && k.startsWith(pattern))
+        .cast<String>()
+        .toList();
   }
 } 

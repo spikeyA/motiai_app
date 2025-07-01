@@ -33,7 +33,7 @@ Future<void> _inspectHiveData() async {
   print('==========================\n');
   
   // Check quotes
-  final allQuotes = HiveQuoteService.instance.getAllQuotes();
+  final allQuotes = await HiveQuoteService.instance.getAllQuotes();
   final localQuotes = allQuotes.where((q) => !q.id.startsWith('ai_')).toList();
   final aiQuotes = allQuotes.where((q) => q.id.startsWith('ai_')).toList();
   
@@ -62,24 +62,43 @@ Future<void> _inspectHiveData() async {
   print('  Local: $localImages');
   print('  AI: $aiImages');
   
-  // Check audio files
+  // Check audio files in both possible boxes
   int audioFiles = 0;
   try {
-    final audioBox = await Hive.openBox('audio_files');
+    var audioBox = await Hive.openBox('audio');
+    print('Audio box ("audio") keys: \\${audioBox.keys.toList()}');
+    print('Audio box ("audio") count: \\${audioBox.length}');
     audioFiles = audioBox.length;
-    
-    print('\n🎵 Audio Files:');
-    print('  Stored: $audioFiles');
-    
+    print('\n🎵 Audio Files (audio):');
+    print('  Stored: \\${audioFiles}');
     if (audioFiles > 0) {
-      print('\n📋 Audio Files List:');
+      print('\n📋 Audio Files List (audio):');
       for (final key in audioBox.keys) {
-        print('  - $key');
+        print('  - \\${key}');
       }
     }
   } catch (e) {
-    print('\n🎵 Audio Files:');
+    print('\n🎵 Audio Files (audio):');
     print('  Stored: 0 (audio box not found)');
+  }
+
+  // Now check cached_audio box
+  try {
+    var cachedAudioBox = await Hive.openBox('cached_audio');
+    print('Audio box ("cached_audio") keys: \\${cachedAudioBox.keys.toList()}');
+    print('Audio box ("cached_audio") count: \\${cachedAudioBox.length}');
+    audioFiles += cachedAudioBox.length;
+    print('\n🎵 Audio Files (cached_audio):');
+    print('  Stored: \\${cachedAudioBox.length}');
+    if (cachedAudioBox.length > 0) {
+      print('\n📋 Audio Files List (cached_audio):');
+      for (final key in cachedAudioBox.keys) {
+        print('  - \\${key}');
+      }
+    }
+  } catch (e) {
+    print('\n🎵 Audio Files (cached_audio):');
+    print('  Stored: 0 (cached_audio box not found)');
   }
   
   // Show recent AI quotes
