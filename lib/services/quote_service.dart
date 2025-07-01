@@ -12,11 +12,12 @@ abstract class QuoteService {
   Future<bool> isFavorite(String id);
   Future<Quote> getRandomQuote({String? category, String? tradition}) async {
     print('[QuoteService] Fetching RANDOM quote from LOCAL');
-    List<Quote> allQuotes = await getAllQuotes();
+    final allQuotes = await getAllQuotes();
     if (allQuotes.isEmpty) {
       throw Exception('No quotes found');
     }
-    List<Quote> filteredQuotes = allQuotes;
+    final localQuotes = allQuotes.where((q) => !q.id.startsWith('ai_')).toList();
+    List<Quote> filteredQuotes = localQuotes;
     if (tradition != null) {
       filteredQuotes = filteredQuotes.where((q) => q.tradition.toLowerCase() == tradition.toLowerCase()).toList();
     }
@@ -24,7 +25,7 @@ abstract class QuoteService {
       filteredQuotes = filteredQuotes.where((q) => q.category.toLowerCase() == category.toLowerCase()).toList();
     }
     if (filteredQuotes.isEmpty) {
-      filteredQuotes = allQuotes;
+      filteredQuotes = localQuotes;
     }
     filteredQuotes.shuffle();
     return filteredQuotes.first;

@@ -5,19 +5,30 @@ import 'dart:convert';
 import 'package:path/path.dart' as path;
 import 'package:hive_flutter/hive_flutter.dart';
 import '../lib/models/quote.dart';
+import 'package:hive/hive.dart';
+import 'package:motiai_app/models/quote.dart';
 
-void main() async {
+Future<void> main() async {
+  // Set Hive directory to the current directory or your app's data directory
+  Hive.init(Directory.current.path + '/hive_data');
+
+  // Register adapters
+  Hive.registerAdapter(QuoteAdapter());
+
+  // Open boxes
+  var quotesBox = await Hive.openBox('quotes');
+  var imagesBox = await Hive.openBox('images');
+  var audioBox = await Hive.openBox('audio');
+
+  print('--- Hive Data Audit ---');
+  print('Quotes: [32m${quotesBox.length}[0m');
+  print('Images: [34m${imagesBox.length}[0m');
+  print('Audio: [35m${audioBox.length}[0m');
+
   print('🔍 MotiAI Hive Database Audit');
   print('==============================\n');
 
-  // Initialize Hive
-  await Hive.initFlutter();
-  Hive.registerAdapter(QuoteAdapter());
-  
   // Open boxes
-  final quotesBox = await Hive.openBox('quotes');
-  final imagesBox = await Hive.openBox('cached_images');
-  final audioBox = await Hive.openBox('cached_audio');
   final favoritesBox = await Hive.openBox('favorites');
   final settingsBox = await Hive.openBox('settings');
 
@@ -33,17 +44,17 @@ void main() async {
   // Audit Quotes
   print('📝 QUOTES AUDIT');
   print('===============');
-  final allQuotes = quotesBox.values.toList();
-  final localQuotes = allQuotes.where((q) => !q.id.startsWith('ai_')).toList();
-  final aiQuotes = allQuotes.where((q) => q.id.startsWith('ai_')).toList();
+  final quotes = await quotesBox.values.toList();
+  final localQuotes = quotes.where((q) => !q.id.startsWith('ai_')).toList();
+  final aiQuotes = quotes.where((q) => q.id.startsWith('ai_')).toList();
   
-  print('Total Quotes: ${allQuotes.length}');
+  print('Total Quotes: ${quotes.length}');
   print('Local Quotes: ${localQuotes.length}');
   print('AI Quotes: ${aiQuotes.length}');
   
   // Group by tradition
   final quotesByTradition = <String, int>{};
-  for (final quote in allQuotes) {
+  for (final quote in quotes) {
     quotesByTradition[quote.tradition] = (quotesByTradition[quote.tradition] ?? 0) + 1;
   }
   
@@ -148,7 +159,7 @@ void main() async {
   int totalImagesSize = 0;
   int totalAudioSize = 0;
   
-  for (final quote in allQuotes) {
+  for (final quote in quotes) {
     totalQuotesSize += quote.text.length + quote.author.length + quote.tradition.length;
   }
   

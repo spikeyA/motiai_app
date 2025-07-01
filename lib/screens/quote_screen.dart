@@ -12,6 +12,7 @@ import '../services/audio_service.dart';
 import '../services/affirmation_service.dart';
 import '../models/quote.dart';
 import 'notepad_screen.dart';
+import '../services/background_prefetch_service.dart';
 
 class QuoteScreen extends StatefulWidget {
   final String? category;
@@ -36,6 +37,10 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   bool _isAudioEnabled = true; // Audio toggle state
 
   String? _selectedTradition; // Track the user's chosen tradition
+  String? _lastTradition; // Track last shown tradition
+  Set<String> _shownImageKeys = {}; // Track shown image keys in session
+
+  bool _backgroundPrefetchStarted = false; // Ensure prefetch only runs once
 
   // Dynamic gradients for different moods
   static const List<List<Color>> _gradients = [
@@ -142,7 +147,6 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   Future<void> _generateBackgroundImage(Quote quote) async {
     setState(() {
       _backgroundImageUrl = null;
-      // Set random gradient for new quotes
       _gradientIndex = DateTime.now().millisecondsSinceEpoch % _gradients.length;
     });
     
@@ -151,30 +155,32 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
       await AudioService.playAmbience(quote.tradition);
     }
     
-    // First, check if we have a stored image for this specific quote
-    final storedImage = HiveQuoteService.instance.getStoredImage(quote.id);
-    if (storedImage != null) {
-      print('[QuoteScreen] Using stored image for quote: ${quote.id}');
-      setState(() {
-        _backgroundImageUrl = storedImage;
-      });
-      return;
-    }
-    
-    // If no quote-specific image, try to get a pre-generated image for this tradition
+    // Try to get a pre-generated image for this tradition, avoiding repeats in session
     final traditionKey = quote.tradition.toLowerCase().replaceAll(' ', '_');
-    final randomVariation = (DateTime.now().millisecondsSinceEpoch % 8) + 1;
-    final preGeneratedImageKey = '${traditionKey}_image_$randomVariation';
-    
-    final preGeneratedImage = HiveQuoteService.instance.getStoredImage(preGeneratedImageKey);
+    final allImageKeys = List.generate(8, (i) => '\\${traditionKey}_image_\\${i+1}');
+    final unusedImageKeys = allImageKeys.where((k) => !_shownImageKeys.contains(k)).toList();
+    String? selectedImageKey;
+    if (unusedImageKeys.isNotEmpty) {
+      selectedImageKey = (unusedImageKeys..shuffle()).first;
+    } else {
+      // All images shown, reset
+      _shownImageKeys.clear();
+      selectedImageKey = (allImageKeys..shuffle()).first;
+    }
+    final preGeneratedImage = HiveQuoteService.instance.getStoredImage(selectedImageKey);
     if (preGeneratedImage != null) {
-      print('[QuoteScreen] Using pre-generated image for tradition: $preGeneratedImageKey');
+      print('[QuoteScreen] Using pre-generated image for tradition: \\${selectedImageKey}');
       setState(() {
         _backgroundImageUrl = preGeneratedImage;
       });
-      // Store this image for the current quote for future use
+      _shownImageKeys.add(selectedImageKey);
       HiveQuoteService.instance.storeGeneratedImage(quote.id, preGeneratedImage);
-      print('[QuoteScreen] Stored pre-generated image for quote: ${quote.id}');
+      print('[QuoteScreen] Stored pre-generated image for quote: \\${quote.id}');
+      // After first image/audio is loaded, trigger background prefetch ONCE
+      if (!_backgroundPrefetchStarted) {
+        _backgroundPrefetchStarted = true;
+        BackgroundPrefetchService.startBackgroundPrefetch();
+      }
       return;
     }
     
@@ -233,25 +239,21 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   }
 
   void _generateNewQuote() async {
-    print('[QuoteScreen] useAIQuotes: ${HiveQuoteService.useAIQuotes}');
+    print('[QuoteScreen] useAIQuotes: \\${HiveQuoteService.useAIQuotes}');
     _fadeController.reverse().then((_) async {
       Quote? quoteToShow;
-      if (_nextAIQuote != null) {
-        quoteToShow = _nextAIQuote;
-        _nextAIQuote = null; // Consume the AI quote
-      } else {
-        // Try AI first, fallback to local
-        quoteToShow = await HiveQuoteService.instance.getRandomQuote(
-          category: widget.category,
-          tradition: _selectedTradition ?? widget.tradition,
-        );
-      }
-      if (quoteToShow != null) {
-        setState(() {
-          _currentQuote = quoteToShow;
-        });
-        print('[QuoteScreen] Showing quote: "${_currentQuote!.text}" - ${_currentQuote!.author} [${_currentQuote!.tradition} / ${_currentQuote!.category}] (id: ${_currentQuote!.id})');
-      }
+      List<Quote> allQuotes = await HiveQuoteService.instance.getAllQuotes();
+      // Filter out quotes from the same tradition as last shown
+      List<Quote> filteredQuotes = allQuotes.where((q) => q.tradition != _lastTradition).toList();
+      if (filteredQuotes.isEmpty) filteredQuotes = allQuotes;
+      // Pick a random quote from filtered
+      filteredQuotes.shuffle();
+      quoteToShow = filteredQuotes.first;
+      _lastTradition = quoteToShow.tradition;
+      setState(() {
+        _currentQuote = quoteToShow;
+      });
+      print('[QuoteScreen] Showing quote: "\\${_currentQuote!.text}" - \\${_currentQuote!.author} [\\${_currentQuote!.tradition} / \\${_currentQuote!.category}] (id: \\${_currentQuote!.id})');
       _generateBackgroundImage(_currentQuote!);
       _fadeController.forward();
       _scaleController.forward();
