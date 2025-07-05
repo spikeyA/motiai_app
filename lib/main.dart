@@ -44,6 +44,9 @@ void main() async {
   // Initialize AffirmationService
   await AffirmationService.initialize();
   
+  // Initialize waitlist box
+  await Hive.openBox('waitlist');
+  
   // Request audio permissions only on mobile platforms
   if (Platform.isAndroid || Platform.isIOS) {
     await Permission.microphone.request();

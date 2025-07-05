@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:async';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:http/http.dart' as http;
 import '../services/hive_quote_service.dart';
 import '../services/quote_service.dart';
 import '../services/image_service.dart';
@@ -889,10 +890,251 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
                     ),
                   ],
                 ),
+                
+                const SizedBox(height: 24),
+                
+                // Pro Features Banner
+                _buildProFeaturesBanner(),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // GlassMorphismCard widget
+  Widget _buildGlassMorphismCard({required Widget child}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            spreadRadius: 0,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withOpacity(0.1),
+                  Colors.white.withOpacity(0.05),
+                  Colors.white.withOpacity(0.08),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Pro Features Banner
+  Widget _buildProFeaturesBanner() {
+    return _buildGlassMorphismCard(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            // Icon and title
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome, color: Colors.amber, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  "Pro",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    shadows: _textShadows,
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(width: 12),
+            
+            // Compact feature list
+            Expanded(
+              child: Row(
+                children: [
+                  _buildCompactFeature("Daily", Icons.notifications_active),
+                  const SizedBox(width: 8),
+                  _buildCompactFeature("Voice", Icons.record_voice_over),
+                  const SizedBox(width: 8),
+                  _buildCompactFeature("Affirm", Icons.psychology),
+                ],
+              ),
+            ),
+            
+            // Compact CTA
+            FilledButton(
+              onPressed: () => _showWaitlistDialog(context),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.deepPurple.withOpacity(0.7),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+              child: const Text("Join", style: TextStyle(fontSize: 11)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper widget for feature rows
+  Widget _buildFeatureRow(String text, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.white70),
+          const SizedBox(width: 12),
+          Text(
+            text,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              shadows: _textShadows,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper widget for compact features
+  Widget _buildCompactFeature(String text, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.white70),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.white.withOpacity(0.8),
+            shadows: _textShadows,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Waitlist Dialog
+  void _showWaitlistDialog(BuildContext context) {
+    final emailController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Get Early Access to Pro"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("Be the first to unlock:", style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            _buildFeatureBullet("Daily reminders"),
+            _buildFeatureBullet("Voice narration"),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(
+                hintText: "your@email.com",
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            child: const Text("Not now"),
+            onPressed: () => Navigator.pop(context),
+          ),
+          FilledButton(
+            child: const Text("Join Waitlist"),
+            onPressed: () {
+              if (_isValidEmail(emailController.text)) {
+                _saveEmail(emailController.text);
+                Navigator.pop(context);
+                _showThankYouSnackbar(context);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper widget for feature bullets in dialog
+  Widget _buildFeatureBullet(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle, size: 16, color: Colors.green.shade600),
+          const SizedBox(width: 8),
+          Text(text),
+        ],
+      ),
+    );
+  }
+
+  // Email validation
+  bool _isValidEmail(String email) {
+    return RegExp(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").hasMatch(email);
+  }
+
+  Future<void> _saveEmail(String email) async {
+    final box = Hive.box('waitlist');
+    final emails = box.get('emails', defaultValue: <String>[]) as List<String>;
+    if (!emails.contains(email)) {
+      emails.add(email);
+      await box.put('emails', emails);
+    }
+    
+    // Optional: Sync to your backend (you can implement connectivity check later)
+    try {
+      await http.post(
+        Uri.parse('https://your-api.com/waitlist'),
+        body: jsonEncode({'email': email, 'app_version': '1.0.0'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      // Silently fail if backend is not available
+      print('Backend sync failed: $e');
+    }
+  }
+
+  // Show thank you snackbar
+  void _showThankYouSnackbar(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Thanks! We'll be in touch when Pro features launch."),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 3),
       ),
     );
   }
