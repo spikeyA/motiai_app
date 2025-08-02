@@ -54,7 +54,7 @@ class HiveQuoteService implements QuoteService {
   }
   
   /// Developer toggle: set to false to disable AI quotes and use only local quotes
-  static bool useAIQuotes = false;
+  static bool useAIQuotes = true;
   
   /// Check Anthropic API status and return a user-friendly message
   static Future<String> getAnthropicStatus() async {
@@ -376,6 +376,70 @@ class HiveQuoteService implements QuoteService {
         filteredQuotes = filteredQuotes.where((q) => !q.id.startsWith('ai_')).toList();
       }
     }
+    filteredQuotes.shuffle();
+    return filteredQuotes.first;
+  }
+
+  /// Get random quote while avoiding recent traditions
+  Future<Quote> getRandomQuoteWithTraditionVariety({
+    String? category, 
+    String? tradition, 
+    List<String>? avoidTraditions
+  }) async {
+    print('[HiveQuoteService] Getting random quote with tradition variety (avoid: $avoidTraditions)');
+    
+    // 1. Try Anthropic if enabled
+    if (useAIQuotes) {
+      final aiQuote = await fetchQuoteFromAnthropic();
+      if (aiQuote != null) {
+        // Check if AI quote tradition should be avoided
+        if (avoidTraditions == null || !avoidTraditions.contains(aiQuote.tradition.trim())) {
+          print('[HiveQuoteService] Using AI-generated quote: "${aiQuote.text}"');
+          return aiQuote;
+        }
+      }
+    }
+    
+    // 2. Fallback to Hive/local
+    List<Quote> allQuotes = await getAllQuotes();
+    if (allQuotes.isEmpty) {
+      throw Exception('No quotes found');
+    }
+    
+    // Filter out AI quotes when useAIQuotes is false
+    List<Quote> filteredQuotes = allQuotes;
+    if (!useAIQuotes) {
+      filteredQuotes = filteredQuotes.where((q) => !q.id.startsWith('ai_')).toList();
+    }
+    
+    // Filter out traditions to avoid
+    if (avoidTraditions != null && avoidTraditions.isNotEmpty) {
+      filteredQuotes = filteredQuotes.where((q) => 
+        !avoidTraditions.contains(q.tradition.trim())
+      ).toList();
+      print('[HiveQuoteService] After avoiding traditions, ${filteredQuotes.length} quotes remaining');
+    }
+    
+    // Apply category and tradition filters
+    if (tradition != null) {
+      final trimmedTradition = tradition.trim().toLowerCase();
+      filteredQuotes = filteredQuotes.where(
+        (q) => q.tradition.trim().toLowerCase() == trimmedTradition
+      ).toList();
+    }
+    if (category != null) {
+      filteredQuotes = filteredQuotes.where((q) => q.category.toLowerCase() == category.toLowerCase()).toList();
+    }
+    
+    // If no quotes available after filtering, reset and use all quotes
+    if (filteredQuotes.isEmpty) {
+      print('[HiveQuoteService] No quotes available after tradition filtering, using all quotes');
+      filteredQuotes = allQuotes;
+      if (!useAIQuotes) {
+        filteredQuotes = filteredQuotes.where((q) => !q.id.startsWith('ai_')).toList();
+      }
+    }
+    
     filteredQuotes.shuffle();
     return filteredQuotes.first;
   }
