@@ -84,6 +84,10 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   // Track which quotes have been shown for each tradition
   final Map<String, List<String>> _shownQuotesByTradition = {};
 
+  // Track recent traditions to prevent repetition
+  final List<String> _recentTraditions = [];
+  static const int _maxRecentTraditions = 3; // Don't repeat last 3 traditions
+
   Timer? _gradientTimer;
   Timer? _quoteTimer;
 
@@ -126,6 +130,14 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
       _currentQuote = quote;
     });
     print('[QuoteScreen] Set current quote: ${_currentQuote?.text ?? 'null'}');
+    
+    // Initialize recent traditions tracking with the first quote
+    if (quote != null) {
+      final tradition = quote.tradition.trim();
+      _recentTraditions.add(tradition);
+      _lastTradition = tradition;
+      print('[QuoteScreen] Initialized with tradition: $tradition');
+    }
     
     // 2. Generate background image for the initial quote
     if (quote != null) {
@@ -240,26 +252,49 @@ class _QuoteScreenState extends State<QuoteScreen> with TickerProviderStateMixin
   }
 
   void _generateNewQuote() async {
-    print('[QuoteScreen] useAIQuotes: \\${HiveQuoteService.useAIQuotes}');
+    print('[QuoteScreen] useAIQuotes: ${HiveQuoteService.useAIQuotes}');
     _fadeController.reverse().then((_) async {
       Quote? quoteToShow;
-      List<Quote> allQuotes = await HiveQuoteService.instance.getAllQuotes();
-      // Filter out quotes from the same tradition as last shown
-      List<Quote> filteredQuotes = allQuotes.where((q) => q.tradition != _lastTradition).toList();
-      if (filteredQuotes.isEmpty) filteredQuotes = allQuotes;
-      // Pick a random quote from filtered
-      filteredQuotes.shuffle();
-      quoteToShow = filteredQuotes.first;
-      _lastTradition = quoteToShow.tradition;
-      setState(() {
-        _currentQuote = quoteToShow;
-      });
-      print('[QuoteScreen] Showing quote: "\\${_currentQuote!.text}" - \\${_currentQuote!.author} [\\${_currentQuote!.tradition} / \\${_currentQuote!.category}] (id: \\${_currentQuote!.id})');
-      _generateBackgroundImage(_currentQuote!);
-      _fadeController.forward();
-      _scaleController.forward();
-      // Start fetching the next AI quote in the background
-      _fetchNextAIQuote();
+      
+      try {
+        // Use the new method that avoids recent traditions
+        quoteToShow = await HiveQuoteService.instance.getRandomQuoteWithTraditionVariety(
+          category: widget.category,
+          tradition: widget.tradition,
+          avoidTraditions: _recentTraditions,
+        );
+        
+        // Update recent traditions tracking
+        final newTradition = quoteToShow.tradition.trim();
+        _recentTraditions.add(newTradition);
+        
+        // Keep only the last N traditions
+        if (_recentTraditions.length > _maxRecentTraditions) {
+          _recentTraditions.removeAt(0);
+        }
+        
+        _lastTradition = newTradition;
+        
+        setState(() {
+          _currentQuote = quoteToShow;
+        });
+        
+        print('[QuoteScreen] Showing quote: "${_currentQuote!.text}" - ${_currentQuote!.author} [${_currentQuote!.tradition} / ${_currentQuote!.category}] (id: ${_currentQuote!.id})');
+        print('[QuoteScreen] Recent traditions: $_recentTraditions');
+        
+        _generateBackgroundImage(_currentQuote!);
+        _fadeController.forward();
+        _scaleController.forward();
+        
+        // Start fetching the next AI quote in the background
+        _fetchNextAIQuote();
+        
+      } catch (e) {
+        print('[QuoteScreen] Error generating new quote: $e');
+        // Fallback to original method if there's an error
+        _fadeController.forward();
+        _scaleController.forward();
+      }
     });
   }
 
